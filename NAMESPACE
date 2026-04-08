@@ -1,0 +1,9 @@
+# Export the main function
+export(modelVoxel)
+
+# Import necessary external functions
+import(doParallel)
+import(foreach)
+import(nifti.io)
+import(R.utils)
+import(parallel)
