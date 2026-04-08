@@ -237,18 +237,17 @@ modelVoxel <- function(nii_data,
 model.fxn <- function(X, ...) {
   ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   coords <- vxl.ls[X, ]
-  if (!is.na(debug) | verbose) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
+  if (!is.na(debug)) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
   df <- pf
   df$nii <- numeric(nrow(df))
   for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
-  if (!is.na(debug) | verbose) { print(">>>Data Loaded") }
+  if (!is.na(debug)) { print(">>>Data Loaded") }
 
   ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
-  output <- model_fcn(df)
-  assign(model_pfx, output)
+  modelResult <- model_fcn(df)
 
   ## Save voxelwise output table - - - - - - - - - - - - - - - - - - - - - - - -
-  table.to.nii(in.table = get(model_pfx), coords=coords, save.dir=dir_scratch,
+  table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
                do.log=TRUE, model.string=model_pfx,
                img.dims=img_dims, pixdim=pixdim, orient=orient)
 
