@@ -33,7 +33,7 @@ modelVoxel <- function(nii_data,
   if (verbose) { message(sprintf("Work directory set to: %s", dir_scratch)) }
   
   # load required libraries ------------------------------------------------------
-  core_libs c("doParallel", "nifti.io", "tools", "R.utils")
+  core_libs <- c("doParallel", "nifti.io", "tools", "R.utils")
   all_libs <- unique(c(core_libs, model_libraries))
   for (lib in all_libs) {
     if (!require(lib, character.only = TRUE, quietly = TRUE)) {
