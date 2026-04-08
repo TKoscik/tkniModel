@@ -223,7 +223,7 @@ model.fxn <- function(X, ...) {
   if (!is.na(debug)) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
   df <- pf
   df$nii <- numeric(nrow(df))
-  for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$fls[i], coords) }
+  for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
   if (!is.na(debug())) { print(">>>Data Loaded") }
 
   ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
