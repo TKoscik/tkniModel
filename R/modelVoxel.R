@@ -152,19 +152,32 @@ modelVoxel <- function(nii_data,
   # Transfer & Decompress Participant Files ------------------------------------ 
   for (i in 1:nrow(pf)) {
     original_path <- pf$nii_file[i]
-    # Unique name to prevent collisions
-    scratch_filename <- paste0("row_", i, "_", basename(original_path))
-    local_path <- file.path(dir_scratch, scratch_filename)
-    # Fast copy from network to scratch
-    file.copy(original_path, local_path, overwrite = TRUE)    
-    # Decompress locally
-    if (grepl("\\.gz$", local_path)) {
-      pf$nii_file[i] <- gunzip(local_path, remove = TRUE, overwrite = TRUE)
+    
+    # Define the final target name (the uncompressed .nii)
+    # We strip the .gz if it exists to know what the final filename should be
+    clean_basename <- gsub("\\.gz$", "", basename(original_path))
+    scratch_filename <- paste0("row_", i, "_", clean_basename)
+    local_path_nii <- file.path(dir_scratch, scratch_filename)
+    
+    # CHECK: Does the uncompressed file already exist from a previous run?
+    if (file.exists(local_path_nii)) {
+      if (verbose && i == 1) message("Found existing files in scratch, skipping transfer...")
+      pf$nii_file[i] <- local_path_nii
     } else {
-      pf$nii_file[i] <- local_path
-    }    
+      # If not, we need to bring it over
+      local_path_raw <- file.path(dir_scratch, paste0("row_", i, "_", basename(original_path)))
+      file.copy(original_path, local_path_raw, overwrite = TRUE)
+      
+      # Decompress if it's a .gz
+      if (grepl("\\.gz$", local_path_raw)) {
+        pf$nii_file[i] <- R.utils::gunzip(local_path_raw, remove = TRUE, overwrite = TRUE)
+      } else {
+        pf$nii_file[i] <- local_path_raw
+      }
+    }
+    
     if (verbose && i %% 10 == 0) {
-      message(sprintf("Transferred and prepared %d of %d files...", i, nrow(pf)))
+      message(sprintf("Prepared %d of %d files...", i, nrow(pf)))
     }
   }
 
