@@ -20,7 +20,6 @@ modelVoxel <- function(nii_data,
   if (missing(nii_data)) { message("Error: 'nii_data' is required."); missing_input <- TRUE }
   if (missing(df_data)) { message("Error: 'df_data' is required."); missing_input <- TRUE }
   if (missing(model_fcn)) { message("Error: 'model_fcn' is required."); missing_input <- TRUE }
-  if (missing(output_fcn)) { message("Error: 'output_fcn' is required."); missing_input <- TRUE }
   if (missing_input) { 
     stop("Missing required arguments. Please check the messages above and try again.", call. = FALSE) 
   }
