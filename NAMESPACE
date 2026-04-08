@@ -2,7 +2,6 @@
 export(modelVoxel)
 export(modelCluster)
 export(cluster3D)
-export(clusterTable)
 
 # Visualization Utilities
 export(drawOverlay)
