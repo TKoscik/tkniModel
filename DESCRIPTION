@@ -14,4 +14,15 @@ Imports:
     foreach,
     nifti.io,
     R.utils,
-    parallel
+    parallel,
+    ggplot2,
+    gridExtra,
+    raster,
+    sp,
+    tools,
+    grDevices,
+    methods,
+    stats,
+    lmerTest,
+    effects
+RoxygenNote: 7.2.3
