@@ -4,8 +4,10 @@ Title: Parallel Voxel-wise Modeling for Neuroimaging
 Version: 0.1.0
 Author: Timothy R. Koscik <tkoscik@uams.edu>
 Maintainer: Timothy R. Koscik <tkoscik@uams.edu>
-Description: A high-performance computing (HPC) oriented tool for 
-    voxel-wise neuroimaging analysis using nifti.io and parallel backends.
+Description: A specialized toolkit for neuroimaging analysis on local and HPC 
+    environments. Features include BIDS-compliant file matching, automated 
+    scratch I/O management, voxel-wise modeling, cluster thresholding, 
+    and advanced ggplot2-based brain overlays.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
