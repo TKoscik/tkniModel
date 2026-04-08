@@ -233,7 +233,7 @@ model.fxn <- function(X, ...) {
   ## Save voxelwise output table - - - - - - - - - - - - - - - - - - - - - - - -
   table.to.nii(in.table = get(model_pfx), coords=coords, save.dir=dir_scratch,
                do.log=TRUE, model.string=model_pfx,
-                 img.dims=img_dims, pixdim=pixdim, orient=orient)
+               img.dims=img_dims, pixdim=pixdim, orient=orient)
 
   if (verbose) {
     print(sprintf("(%d, %d, %d) DONE, %d remaining", coords[1], coords[2], coords[3], n.vxls - X))
@@ -251,7 +251,7 @@ if (!is.na(debug) && debug > 0) {
   # Run voxels in parallel
   if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
   registerDoParallel(num_cores)
-  invisible(foreach(X=1:n.vxls, .packages=all_libs) %dopar% model.fxn(X))
+  invisible(foreach(X=1:n.vxls, .packages=all_libs, .export=ls(envir=environment())) %dopar% model.fxn(X))
   stopImplicitCluster() # Stop parallelization
 }
 
