@@ -31,7 +31,7 @@ The package is designed to be used in three distinct phases:
 
 ```r
 # Install from GitHub
-# devtools::install_github("yourusername/tkniModel")
+devtools::install_github("TKoscik/tkniModel")
 ```
 
 ## Quick Example
