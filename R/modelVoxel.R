@@ -12,7 +12,7 @@ modelVoxel <- function(nii_data,
                        rand_order=TRUE,
                        num_cores=parallel::detectCores()-1,
                        verbose=TRUE,
-                       debug=FALSE,
+                       debug=NA,
                        cleanup=TRUE) {
     
   # check for missing data -----------------------------------------------------
@@ -237,11 +237,11 @@ modelVoxel <- function(nii_data,
 model.fxn <- function(X, ...) {
   ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   coords <- vxl.ls[X, ]
-  if (!is.na(debug)) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
+  if (!is.na(debug) | verbose) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
   df <- pf
   df$nii <- numeric(nrow(df))
   for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
-  if (!is.na(debug())) { print(">>>Data Loaded") }
+  if (!is.na(debug) | verbose) { print(">>>Data Loaded") }
 
   ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
   output <- model_fcn(df)
