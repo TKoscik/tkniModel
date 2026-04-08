@@ -192,7 +192,7 @@ modelVoxel <- function(nii_data,
     if (verbose) message("No ROI specified. Generating mask from first data file...")
     mask <- read.nii.volume(pf$nii_file[1]) * 0 + 1
     # gather image info
-    img.dims <- nifti.io::info.nii(pf$nii_file[1], "dims")
+    img_dims <- nifti.io::info.nii(pf$nii_file[1], "dims")
     pixdim   <- nifti.io::info.nii(pf$nii_file[1], "pixdim")
     orient   <- nifti.io::info.nii(pf$nii_file[1], "orient")
   }
@@ -201,7 +201,7 @@ modelVoxel <- function(nii_data,
    # initialize log file if it doesn't exist --------------------------------------
   log.nii <- paste0(dir_scratch, "/log.nii")
   if (file.exists(log.nii) == FALSE || restart_log == TRUE) {
-    init.nii(log.nii, dims=img.dims, pixdim=pixdim, orient=orient, init.value=0)
+    init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
     write.nii.volume(log.nii, vol.num=1, value=mask)
   } else {
     log <- read.nii.volume(log.nii,1)
