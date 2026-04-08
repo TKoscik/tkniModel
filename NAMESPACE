@@ -1,9 +1,19 @@
-# Export the main function
+# Main Processing and Clustering
 export(modelVoxel)
+export(modelCluster)
+export(cluster3D)
+export(clusterTable)
 
-# Import necessary external functions
+# Visualization Utilities
+export(drawOverlay)
+export(drawEffect)
+export(slicesToRaster)
+
+# Core Imports
 import(doParallel)
 import(foreach)
 import(nifti.io)
 import(R.utils)
-import(parallel)
+import(ggplot2)
+import(gridExtra)
+import(raster)
