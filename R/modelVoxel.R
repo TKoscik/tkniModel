@@ -11,11 +11,12 @@ modelVoxel <- function(nii_data,
                        restart_log=TRUE,
                        rand_order=TRUE,
                        num_cores=parallel::detectCores()-1,
-                       verbose=FALSE,
+                       verbose=TRUE,
                        debug=FALSE,
                        cleanup=TRUE) {
     
   # check for missing data -----------------------------------------------------
+  if (verbose) { message("Checking required inputs") }
   missing_input <- FALSE
   if (missing(nii_data)) { message("Error: 'nii_data' is required."); missing_input <- TRUE }
   if (missing(df_data)) { message("Error: 'df_data' is required."); missing_input <- TRUE }
@@ -27,11 +28,13 @@ modelVoxel <- function(nii_data,
   if (missing(model_pfx)) { model_pfx <- sprintf("model_%s", format(Sys.time(), "%Y%m%dT%H%M%S"))}
 
   # setup scratch directory ------------------------------------------------------
+  if (verbose) { message("Setting scratch directory") }
   if (is.null(dir_scratch)) { dir_scratch <- file.path(dir_save, "scratch") }
   if (!dir.exists(dir_scratch)) { dir.create(dir_scratch, recursive = TRUE) }
   if (verbose) { message(sprintf("Work directory set to: %s", dir_scratch)) }
   
   # load required libraries ------------------------------------------------------
+  if (verbose) { message("Loading libraries") }
   core_libs <- c("doParallel", "nifti.io", "tools", "R.utils")
   all_libs <- unique(c(core_libs, model_libraries))
   for (lib in all_libs) {
@@ -41,7 +44,7 @@ modelVoxel <- function(nii_data,
   }
 
   # load data frame for analysis -------------------------------------------------
-  if (verbose) message(sprintf("Reading data frame: %s", df_data))
+  if (verbose) { message(sprintf("Reading data frame: %s", df_data)) }
   ext <- file_ext(df_data)
   if (ext == "csv") {
     pf <- read.csv(df_data, stringsAsFactors = FALSE)
@@ -52,6 +55,7 @@ modelVoxel <- function(nii_data,
   }
 
   ## make sure IDs are factors, and set the order of groups if not alphabetical
+  if (verbose) { message("Converting IDs to factors") }
   for (id in id_var) {
     if (id %in% names(pf)) {
       pf[[id]] <- as.factor(pf[[id]])
@@ -80,7 +84,7 @@ modelVoxel <- function(nii_data,
           labls  <- unlist(strsplit(parts[3], ","))
           pf[[var_name]] <- factor(pf[[var_name]], levels = levs, labels = labls)
         }        
-        if (verbose) message(sprintf("Processed factor: %s", var_name))
+        if (verbose) { message(sprintf("Processed factor: %s", var_name))}
       } else {
         warning(sprintf("Variable '%s' not found in data frame.", var_name))
       }
