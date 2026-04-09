@@ -337,15 +337,19 @@ modelVoxel <- function(nii_data,
   # Transfer Results from Scratch to Save ----------------------------------
   # Identify the results (everything in scratch except the temporary unzipped participant files)
   # -nifti.io will create files starting with the modelResult
-  #result_files <- list.files(dir_scratch, pattern = paste0("^", model_pfx), full.names = TRUE)
-  result_files <- list.files(dir_scratch, 
-    pattern = paste0("^", model_pfx, "|failed_voxels\\.log|_log\\.nii$"), 
-    full.names = TRUE)
-  if (length(result_files) > 0) {
-    if (verbose) message(sprintf("Moving %d result and log files to final directory...", length(result_files)))
-    file.copy(result_files, output_dir, overwrite = TRUE)
+  # -Compress in scratch first (faster local I/O). 
+  if (verbose) { message("Moving results and log files to final directory...") }
+  result_files <- list.files(dir_scratch, pattern="modelResult", full.names=TRUE)
+  for (f in result_files) {
+    gz_file <- gzip(f, remove = TRUE, overwrite = TRUE)
+    file.copy(gz_file, file.path(output_dir, basename(gz_file)), overwrite = TRUE)
+  }    
+  gzip(file.path(dir_scratch, "log.nii"), remove = TRUE, overwrite = TRUE)
+  file.copy(file.path(dir_scratch, "log.nii.gz"), output_dir, overwrite=TRUE)
+  if (file.exists(file.path(dir_scratch, "failed_voxels.log"))) {
+    file.copy(file.path(dir_scratch, "failed_voxels.log"), output_dir, overwrite=TRUE)
   }
-
+  
   # Cleanup ----------------------------------------------------------------
   ## This removes the scratch folder and all unzipped participant copies
   if (cleanup) {
