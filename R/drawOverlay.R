@@ -65,7 +65,7 @@ drawOverlay <- function(anat_nii,
       img_mask[[i]] <- array(as.numeric(img_over[[i]] != 0), dim=dim(img_anat))
     } else {
       if (mask_vol[[i]] == "all") {
-        mask_vols <- 1:(info.nii(mask_nii[[i]]), "volumes")
+        mask_vols <- 1:info.nii(mask_nii[[i]]), "volumes")
       } else if (is.numeric(mask_vol[[i]])) {
         mask_vols <- mask_vol[[i]]
       } else { stop("Cannot parse mask volumes") }
