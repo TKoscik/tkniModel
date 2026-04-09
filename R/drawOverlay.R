@@ -50,40 +50,40 @@ drawOverlay <- function(anat_nii,
   if (missing(img_format)) { img_format <- "png" }
 
   # Load Anatomical ----
-  img.anat <- read.nii.volume(anat.nii, 1)
-  img.anat[img.anat==0] <- NA
-  img.dims <- dim(img.anat)
+  img_anat <- read.nii.volume(anat_nii, 1)
+  img_anat[img_anat==0] <- NA
+  img_dims <- dim(img_anat)
 
   # Load Overlays ----
-  img.over <- vector("list", length=n.overlays)
-  for (i in 1:n.overlays) { img.over[[i]] <- read.nii.volume(over.nii[[i]], over.vol[i]) }
+  img_over <- vector("list", length=n_overlays)
+  for (i in 1:n_overlays) { img_over[[i]] <- read.nii.volume(over_nii[[i]], over_vol[i]) }
 
   # Load mask ----
-  img.mask <- vector("list", length=n.overlays)
-  for (i in 1:n.overlays) {
-    if (mask.nii[[i]] == "none") {
-      img.mask[[i]] <- array(as.numeric(img.over[[i]] != 0), dim=dim(img.anat))
+  img_mask <- vector("list", length=n_overlays)
+  for (i in 1:n_overlays) {
+    if (mask_nii[[i]] == "none") {
+      img_mask[[i]] <- array(as.numeric(img_over[[i]] != 0), dim=dim(img_anat))
     } else {
-      if (mask.vol[[i]] == "all") {
-        mask.vols <- 1:(nii.dims(mask.nii[[i]])[4])
-      } else if (is.numeric(mask.vol[[i]])) {
-        mask.vols <- mask.vol[[i]]
+      if (mask_vol[[i]] == "all") {
+        mask_vols <- 1:(info.nii(mask_nii[[i]]), "volumes")
+      } else if (is.numeric(mask_vol[[i]])) {
+        mask_vols <- mask_vol[[i]]
       } else { stop("Cannot parse mask volumes") }
 
-      img.mask[[i]] <- array(0, dim=dim(img.anat))
-      for (j in mask.vols) {
-        img.mask[[i]] <- img.mask[[i]] + read.nii.volume(mask.nii[[i]], j)
+      img_mask[[i]] <- array(0, dim=dim(img_anat))
+      for (j in mask_vols) {
+        img_mask[[i]] <- img_mask[[i]] + read.nii.volume(mask_nii[[i]], j)
       }
-      img.mask[[i]][img.mask[[i]]>1] <- 1
+      img_mask[[i]][img_mask[[i]]>1] <- 1
     }
-    img.over[[i]][img.mask[[i]]==0] <- NA
+    img_over[[i]][img_mask[[i]]==0] <- NA
   }
 
   # Load ROIs ----
-  if (!is.null(roi.nii)) {
-    img.roi <- read.nii.volume(roi.nii, 1)
-    ex.rois <- c(0, which(!(1:max(img.roi) %in% roi.val)))
-    for (i in ex.rois) { img.roi[img.roi==i] <- NA }
+  if (!is.null(roi_nii)) {
+    img_roi <- read.nii.volume(roi_nii, 1)
+    ex_rois <- c(0, which(!(1:max(img_roi) %in% roi_val)))
+    for (i in ex_rois) { img_roi[img_roi==i] <- NA }
   }
 
   # 3. Slice Selection Logic --------------------------------------------------
@@ -161,23 +161,23 @@ drawOverlay <- function(anat_nii,
   )
 
   # Get dimensions for scaling the label positions on the raster plot
-  anat_dims <- nifti.io::nii.dims(local_anat)
+  anat_dims <- nifti.io::info.nii(local_anat, "dims")
 
   if (orientation %in% c("coronal", "c")) {
-    tform <- unlist(nifti.io::nii.hdr(local_anat, "srow_y"))
+    tform <- unlist(nifti.io::info.nii(local_anat, "srow_y"))
     world_labels$xvar <- world_labels$xvar * anat_dims[1] * n_col + anat_dims[1] / 2
     world_labels$yvar <- world_labels$yvar * anat_dims[3] * n_row - 3
     # Coordinate = (0-based Index * Scale) + Offset
     world_labels$labels <- (slices - 1) * tform[2] + tform[4]
 
   } else if (orientation %in% c("axial", "a")) {
-    tform <- unlist(nifti.io::nii.hdr(local_anat, "srow_z"))
+    tform <- unlist(nifti.io::info.nii(local_anat, "srow_z"))
     world_labels$xvar <- world_labels$xvar * anat_dims[1] * n_col + anat_dims[1] / 2
     world_labels$yvar <- world_labels$yvar * anat_dims[2] * n_row - 3
     world_labels$labels <- (slices - 1) * tform[3] + tform[4]
 
   } else if (orientation %in% c("sagittal", "s")) {
-    tform <- unlist(nifti.io::nii.hdr(local_anat, "srow_x"))
+    tform <- unlist(nifti.io::info.nii(local_anat, "srow_x"))
     world_labels$xvar <- world_labels$xvar * anat_dims[2] * n_col + anat_dims[2] / 2
     world_labels$yvar <- world_labels$yvar * anat_dims[3] * n_row - 3
     world_labels$labels <- (slices - 1) * tform[1] + tform[4]
