@@ -287,30 +287,32 @@ modelVoxel <- function(nii_data,
     if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
     proc_start <- Sys.time()
     # Split indices into a list of chunks
-    chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
+    chunker <- round(seq(1, n.vxls, length.out=num_cores+1))
+    chunk_start <- chunker[1:(length(chunker)-1)]
+    chunk_stop <- c(chunker[2:(length(chunker)-1)] - 1, chunker[length(chunker)])
+    #chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
     invisible(
-      foreach(chk_id = 1:length(chunks),
+      foreach(chk_id = 1:num_cores,
               .packages = all_libs,
               .export = ls(envir = environment()),
               .errorhandling = "pass") %dopar% {
         worker_start <- Sys.time()
-        current_chunk <- chunks[[chk_id]]
-        n_in_chunk <- length(current_chunk)
+        vxl_chunk <- vxl.ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
+        n_in_chunk <- nrow(vxl_chunk)
         worker_id <- sprintf("worker_%02d", chk_id)
         for (i in 1:n_in_chunk) {
-          X <- current_chunk[i]
           tryCatch({
-            coords <- vxl_ls[X, ]
+            coords <- vxl_chunk[i, ]
             df <- pf
             df$nii <- numeric(nrow(df))
             modelResult <- model.fxn(coords, df)
             ## add short delay periodically to reduce the likelihood of I/O collisions
-            Sys.sleep(runif(1, 0, 0.01))
+            #Sys.sleep(runif(1, 0, 0.01))
             table.to.nii(in.table=modelResult, coords=coords, save.dir=dir_scratch,
                          do.log=TRUE, model.string=model_pfx,
                          img.dims=img_dims, pixdim=pixdim, orient=orient)
-            Sys.sleep(runif(1, 0, 0.01))
+            #Sys.sleep(runif(1, 0, 0.01))
             write.nii.voxel(log.nii, coords, 2)
           }, error = function(e) {
             error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
