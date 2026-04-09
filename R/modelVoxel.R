@@ -284,7 +284,7 @@ modelVoxel <- function(nii_data,
     chunk_stop <- c(chunker[2:(length(chunker)-1)] - 1, chunker[length(chunker)])
     if (verbose) {
       for (i in 1:num_cores) {
-        print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start, chunk_stop))
+        print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start[i], chunk_stop[i))
       }
     }
     
