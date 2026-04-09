@@ -236,7 +236,7 @@ modelVoxel <- function(nii_data,
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
   if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
-  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir_scratch))
+
   ## randomize order ---
   if (rand_order) {
     if (verbose) { message("Randomizing voxel order") }
@@ -255,24 +255,25 @@ modelVoxel <- function(nii_data,
                     n_dropped, img_dims[1], img_dims[2], img_dims[3]))
     vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
   }
-  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir_scratch))
+
   # specify model function -------------------------------------------------------
   ## -load voxelwise data
   ## -run user code (model_fcn)
   ## -save voxelwise output table
   ## -write log nii
-  model.fxn <- function(X, ...) {
-    coords <- vxl_ls[X, ]
-    if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
-    df <- pf
-    df$nii <- numeric(nrow(df))
+  model.fxn <- function(coords, df, ...) {
+    #coords <- vxl_ls[X, ]
+    #if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
+    #df <- pf
+    #df$nii <- numeric(nrow(df))
     for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
     modelResult <- model_fcn(df)
-    table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
-                 do.log=TRUE, model.string=model_pfx,
-                 img.dims=img_dims, pixdim=pixdim, orient=orient)
-    write.nii.voxel(log.nii, coords, 2)
-    if (do_debug) { print(">>>LOG Written") }
+    return(modelResult)
+    #table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
+    #             do.log=TRUE, model.string=model_pfx,
+    #             img.dims=img_dims, pixdim=pixdim, orient=orient)
+    #write.nii.voxel(log.nii, coords, 2)
+    #if (do_debug) { print(">>>LOG Written") }
   }
 
   do_debug=FALSE
@@ -300,7 +301,17 @@ modelVoxel <- function(nii_data,
         for (i in 1:n_in_chunk) {
           X <- current_chunk[i]
           tryCatch({
-            model.fxn(X)
+            coords <- vxl_ls[X, ]
+            df <- pf
+            df$nii <- numeric(nrow(df))
+            modelResult <- model.fxn(coords, df)
+            ## add short delay periodically to reduce the likelihood of I/O collisions
+            Sys.sleep(runif(1, 0, 0.01))
+            table.to.nii(in.table=modelResult, coords=coords, save.dir=dir_scratch,
+                         do.log=TRUE, model.string=model_pfx,
+                         img.dims=img_dims, pixdim=pixdim, orient=orient)
+            Sys.sleep(runif(1, 0, 0.01))
+            write.nii.voxel(log.nii, coords, 2)
           }, error = function(e) {
             error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
             write(error_msg, file = file.path(dir_scratch, "failed_voxels.log"), append = TRUE)
