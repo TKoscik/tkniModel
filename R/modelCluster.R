@@ -16,7 +16,8 @@ modelCluster <- function(nii_estimate,
                          do_neg          = TRUE,
                          dir_save        = getwd(),
                          dir_scratch     = NULL,
-                         verbose         = TRUE) {
+                         verbose         = TRUE,
+                         cleanup         = TRUE) {
 
   # 1. Validation -------------------------------------------------------------
   missing_input <- FALSE
