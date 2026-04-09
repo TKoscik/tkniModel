@@ -7,6 +7,7 @@ drawOverlay <- function(anat_nii,
                         roi_color = "#ff64ff",
                         orientation = "coronal",
                         save_dir = getwd(),
+                        dir_scratch = NULL,
                         file_name = "overlay",
                         img_format = "png",
                         img_w = NULL,
@@ -49,30 +50,74 @@ drawOverlay <- function(anat_nii,
 
   if (missing(img_format)) { img_format <- "png" }
 
+  # 2. Setup Scratch and Decompress -------------------------------------------
+  if (is.null(dir_scratch)) {
+    dir_scratch <- file.path(tempdir(), "drawOverlay_scratch")
+  }
+  if (!dir.exists(dir_scratch)) dir.create(dir_scratch, recursive = TRUE)
+  
+  # Helper to handle local transfer and decompression
+  get_local_nii <- function(path, name) {
+    if (is.null(path) || path == "none") return(path)
+    dest <- file.path(dir_scratch, paste0(name, ".nii"))
+    
+    # Check if already decompressed from a previous run to save time
+    if (file.exists(dest)) return(dest)
+    
+    if (tools::file_ext(path) == "gz") {
+      R.utils::gunzip(path, destname = dest, remove = FALSE, overwrite = TRUE)
+    } else {
+      file.copy(path, dest, overwrite = TRUE)
+    }
+    return(dest)
+  }
+
+  # Update paths to point to scratch versions
+  local_anat <- get_local_nii(anat_nii, "anat")
+  img_dims <- nifti.io::info.nii(local_anat, "dims") # Use local for info
+  
+  local_over_nii <- vector("list", length = n_overlays)
+  for (i in 1:n_overlays) {
+    local_over_nii[[i]] <- get_local_nii(over_nii[[i]], paste0("over_", i))
+  }
+  
+  local_mask_nii <- vector("list", length = n_overlays)
+  for (i in 1:n_overlays) {
+    if (mask_nii[[i]] != "none") {
+      local_mask_nii[[i]] <- get_local_nii(mask_nii[[i]], paste0("mask_", i))
+    } else {
+      local_mask_nii[[i]] <- "none"
+    }
+  }
+  
+  if (!is.null(roi_nii)) {
+    local_roi_nii <- get_local_nii(roi_nii, "roi")
+  }
+  
   # Load Anatomical ----
-  img_anat <- read.nii.volume(anat_nii, 1)
+  img_anat <- read.nii.volume(local_anat, 1)
   img_anat[img_anat==0] <- NA
   img_dims <- dim(img_anat)
 
   # Load Overlays ----
   img_over <- vector("list", length=n_overlays)
-  for (i in 1:n_overlays) { img_over[[i]] <- read.nii.volume(over_nii[[i]], over_vol[i]) }
+  for (i in 1:n_overlays) { img_over[[i]] <- read.nii.volume(local_over_nii[[i]], over_vol[i]) }
 
   # Load mask ----
   img_mask <- vector("list", length=n_overlays)
   for (i in 1:n_overlays) {
-    if (mask_nii[[i]] == "none") {
+    if (local_mask_nii[[i]] == "none") {
       img_mask[[i]] <- array(as.numeric(img_over[[i]] != 0), dim=dim(img_anat))
     } else {
       if (mask_vol[[i]] == "all") {
-        mask_vols <- 1:info.nii(mask_nii[[i]], "volumes")
+        mask_vols <- 1:info.nii(local_mask_nii[[i]], "volumes")
       } else if (is.numeric(mask_vol[[i]])) {
         mask_vols <- mask_vol[[i]]
       } else { stop("Cannot parse mask volumes") }
 
       img_mask[[i]] <- array(0, dim=dim(img_anat))
       for (j in mask_vols) {
-        img_mask[[i]] <- img_mask[[i]] + read.nii.volume(mask_nii[[i]], j)
+        img_mask[[i]] <- img_mask[[i]] + read.nii.volume(local_mask_nii[[i]], j)
       }
       img_mask[[i]][img_mask[[i]]>1] <- 1
     }
@@ -81,7 +126,7 @@ drawOverlay <- function(anat_nii,
 
   # Load ROIs ----
   if (!is.null(roi_nii)) {
-    img_roi <- read.nii.volume(roi_nii, 1)
+    img_roi <- read.nii.volume(local_roi_nii, 1)
     ex_rois <- c(0, which(!(1:max(img_roi) %in% roi_val)))
     for (i in ex_rois) { img_roi[img_roi==i] <- NA }
   }
