@@ -288,17 +288,24 @@ modelVoxel <- function(nii_data,
   } else {
     # Run voxels in parallel
     if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
+    proc_start <- Sys.time()
     # Split indices into a list of chunks
     chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
     invisible(
       foreach(chk_id = 1:length(chunks), .packages = all_libs, .export = ls(envir = environment())) %dopar% {
+        worker_start <- Sys.time()
         current_chunk <- chunks[[chk_id]]
         n_in_chunk <- length(current_chunk)
         worker_id <- sprintf("worker_%02d", chk_id)
         for (i in 1:n_in_chunk) {
           X <- current_chunk[i]
-          model.fxn(X)
+          tryCatch({
+            model.fxn(X)
+          }, error = function(e) {
+            error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
+            write(error_msg, file = file.path(dir_scratch, "failed_voxels.log"), append = TRUE)
+          })
           if (verbose) {
             pct <- floor((i / n_in_chunk) * 100)
             prev_pct <- floor(((i - 1) / n_in_chunk) * 100)
@@ -307,37 +314,45 @@ modelVoxel <- function(nii_data,
             }
           }
         }
+        worker_end <- Sys.time()
+        elapsed <- difftime(worker_end, worker_start, units = "auto")
+        message(sprintf("[%s] COMPLETED. Total elapsed time: %s", worker_id, format(elapsed)))
       }
     )
     #invisible(foreach(X=1:n.vxls, .packages=all_libs, .export=ls(envir=environment())) %dopar% model.fxn(X))
     stopImplicitCluster() # Stop parallelization
+    proc_stop <- Sys.time()
+    elapsed <- difftime(proc_stop, proc_start, units = "auto")
+    message(sprintf("MODELLING COMPLETED. Total elapsed time: %s", format(elapsed)))
   }
 
   # Create Final Output Directory ------------------------------------------
   # We use the user's model prefix to create a specific sub-folder
   if (verbose) { message("Creating output directory") }
-  final_output_dir <- file.path(dir_save, model_pfx)
-  if (!dir.exists(final_output_dir)) {
-    dir.create(final_output_dir, showWarnings = FALSE, recursive = TRUE)
+  output_dir <- file.path(dir_save, model_pfx)
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   }
 
   # Transfer Results from Scratch to Save ----------------------------------
-  if (verbose) message(sprintf("Transferring results to: %s", final_output_dir))
-  
   # Identify the results (everything in scratch except the temporary unzipped participant files)
-  # Usually nifti.io creates files starting with the model_pfx
-  result_files <- list.files(dir_scratch, pattern = paste0("^", model_pfx), full.names = TRUE)
+  # -nifti.io will create files starting with the modelResult
+  #result_files <- list.files(dir_scratch, pattern = paste0("^", model_pfx), full.names = TRUE)
+  result_files <- list.files(dir_scratch, 
+    pattern = paste0("^", model_pfx, "|failed_voxels\\.log|_log\\.nii$"), 
+    full.names = TRUE)
   if (length(result_files) > 0) {
-    file.copy(result_files, final_output_dir, overwrite = TRUE)
+    if (verbose) message(sprintf("Moving %d result and log files to final directory...", length(result_files)))
+    file.copy(result_files, output_dir, overwrite = TRUE)
   }
 
   # Cleanup ----------------------------------------------------------------
+  ## This removes the scratch folder and all unzipped participant copies
   if (cleanup) {
     if (verbose) message("Cleaning up scratch directory...")
-    # This removes the scratch folder and all unzipped participant copies
     unlink(dir_scratch, recursive = TRUE)
   }
   if (verbose) message("Voxelwise analysis complete!")
   # Return the path to the results so the user can easily find them
-  return(final_output_dir)
+  return(output_dir)
 }
