@@ -236,7 +236,7 @@ modelVoxel <- function(nii_data,
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
   if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
-  
+  cat(vxl_ls)
   ## randomize order ---
   if (rand_order) {
     if (verbose) { message("Randomizing voxel order") }
@@ -255,7 +255,7 @@ modelVoxel <- function(nii_data,
                     n_dropped, img_dims[1], img_dims[2], img_dims[3]))
     vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
   }
-  
+  cat(vxl_ls)
   # specify model function -------------------------------------------------------
   ## -load voxelwise data
   ## -run user code (model_fcn)
@@ -263,7 +263,6 @@ modelVoxel <- function(nii_data,
   ## -write log nii
   model.fxn <- function(X, ...) {
     coords <- vxl_ls[X, ]
-    print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3]))
     if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
     df <- pf
     df$nii <- numeric(nrow(df))
@@ -290,7 +289,10 @@ modelVoxel <- function(nii_data,
     chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
     invisible(
-      foreach(chk_id = 1:length(chunks), .packages = all_libs, .export = ls(envir = environment())) %dopar% {
+      foreach(chk_id = 1:length(chunks),
+              .packages = all_libs,
+              .export = ls(envir = environment()),
+              .errorhandling = "pass") %dopar% {
         worker_start <- Sys.time()
         current_chunk <- chunks[[chk_id]]
         n_in_chunk <- length(current_chunk)
