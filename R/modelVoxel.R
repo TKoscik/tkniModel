@@ -233,43 +233,74 @@ modelVoxel <- function(nii_data,
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
 
-# specify model function -------------------------------------------------------
-model.fxn <- function(X, ...) {
-  ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  coords <- vxl.ls[X, ]
-  if (!is.na(debug)) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
-  df <- pf
-  df$nii <- numeric(nrow(df))
-  for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
-  if (!is.na(debug)) { print(">>>Data Loaded") }
+  # Check that voxels are valid --------------------------------------------------
+  valid_rows <- (vxl.ls[, 1] <= img_dims[1]) & 
+                (vxl.ls[, 2] <= img_dims[2]) & 
+                (vxl.ls[, 3] <= img_dims[3])
+  valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
+  n_dropped <- sum(!valid_rows)
+  if (n_dropped > 0) {
+    warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).", 
+                    n_dropped, img_dims[1], img_dims[2], img_dims[3]))
+    vxl.ls <- vxl.ls[valid_rows, , drop = FALSE]
+  }
+  
+  # specify model function -------------------------------------------------------
+  model.fxn <- function(X, ...) {
+    ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    coords <- vxl.ls[X, ]
+    if (do_debug) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
+    df <- pf
+    df$nii <- numeric(nrow(df))
+    for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
 
-  ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
-  modelResult <- model_fcn(df)
+    ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
+    modelResult <- model_fcn(df)
 
-  ## Save voxelwise output table - - - - - - - - - - - - - - - - - - - - - - - -
-  table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
-               do.log=TRUE, model.string=model_pfx,
-               img.dims=img_dims, pixdim=pixdim, orient=orient)
-
-  if (verbose) {
-    print(sprintf("(%d, %d, %d) DONE, %d remaining", coords[1], coords[2], coords[3], n.vxls - X))
+    ## Save voxelwise output table - - - - - - - - - - - - - - - - - - - - - - - -
+    table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
+                 do.log=TRUE, model.string=model_pfx,
+                 img.dims=img_dims, pixdim=pixdim, orient=orient)
+  
+    if (do_debug) {
+      write.nii.voxel(log.nii, coords, 2)
+      print(">>>LOG Written")
+    }
   }
 
-  if (is.na(debug)) { write.nii.voxel(log.nii, coords, 2) }
-  if (!is.na(debug)) { print(">>>LOG Written") }
-}
-
-if (!is.na(debug) && debug > 0) {
-    message(sprintf("DEBUG MODE: Running first %d voxels sequentially...", debug))
-    for (X in 1:debug) { model.fxn(X) }
-    message("DEBUG DONE")
-} else {
-  # Run voxels in parallel
-  if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
-  registerDoParallel(num_cores)
-  invisible(foreach(X=1:n.vxls, .packages=all_libs, .export=ls(envir=environment())) %dopar% model.fxn(X))
-  stopImplicitCluster() # Stop parallelization
-}
+  do_debug=FALSE
+  if (!is.na(debug) && debug > 0) {
+      do_debug=TRUE
+      message(sprintf("DEBUG MODE: Running first %d voxels sequentially...", debug))
+      for (X in 1:debug) { model.fxn(X) }
+      message("DEBUG DONE")
+  } else {
+    # Run voxels in parallel
+    if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
+    # Split indices into a list of chunks
+    chunks <- split(vxl.ls, cut(seq_along(vxl.ls), n_chunks, labels = FALSE))
+    registerDoParallel(num_cores)
+    invisible(
+      foreach(chk_id = 1:length(chunks), .packages = all_libs, .export = ls(envir = environment())) %dopar% {
+        current_chunk <- chunks[[chk_id]]
+        n_in_chunk <- length(current_chunk)
+        worker_id <- sprintf("worker_%02d", chk_id)
+        for (i in 1:n_in_chunk) {
+          X <- current_chunk[i]
+          model.fxn(X)
+          if (verbose) {
+            pct <- floor((i / n_in_chunk) * 100)
+            prev_pct <- floor(((i - 1) / n_in_chunk) * 100)
+            if (pct > prev_pct) {
+              message(sprintf("[%s] progress: %d%% completed", worker_id, pct))
+            }
+          }
+        }
+      }
+    )
+    #invisible(foreach(X=1:n.vxls, .packages=all_libs, .export=ls(envir=environment())) %dopar% model.fxn(X))
+    stopImplicitCluster() # Stop parallelization
+  }
 
   # Create Final Output Directory ------------------------------------------
   # We use the user's model prefix to create a specific sub-folder
