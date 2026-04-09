@@ -278,7 +278,7 @@ modelVoxel <- function(nii_data,
     # Run voxels in parallel
     if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
     # Split indices into a list of chunks
-    chunks <- split(vxl_ls, cut(seq_along(vxl_ls), n_chunks, labels = FALSE))
+    chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
     invisible(
       foreach(chk_id = 1:length(chunks), .packages = all_libs, .export = ls(envir = environment())) %dopar% {
