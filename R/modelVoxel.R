@@ -294,6 +294,7 @@ modelVoxel <- function(nii_data,
       vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
       n_in_chunk <- nrow(vxl_chunk)
       worker_id <- sprintf("worker_%02d", chk_id)
+      print(sprintf("starting worker_%02d", chk_id))
       for (i in 1:n_in_chunk) {
         tryCatch({
           coords <- vxl_chunk[i, ]
