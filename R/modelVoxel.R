@@ -211,9 +211,9 @@ modelVoxel <- function(nii_data,
     if (verbose) message("No ROI specified. Generating mask from first data file...")
     mask <- read.nii.volume(pf$nii_file[1]) * 0 + 1
     # gather image info
-    img_dims <- nifti.io::info.nii(pf$nii_file[1], "dims")
-    pixdim   <- nifti.io::info.nii(pf$nii_file[1], "pixdim")
-    orient   <- nifti.io::info.nii(pf$nii_file[1], "orient")
+    img_dims <- info.nii(pf$nii_file[1], "dims")
+    pixdim   <- info.nii(pf$nii_file[1], "pixdim")
+    orient   <- info.nii(pf$nii_file[1], "orient")
   }
   vxl_ls <- which(mask!=0, arr.ind=TRUE)
 
@@ -227,8 +227,8 @@ modelVoxel <- function(nii_data,
   } else {
     if (verbose) { message("No log found, initializing...") }
     log <- read.nii.volume(log.nii,1)
-    vxls.not_run <- (log == 1) * 1
-    vxl_ls <- which(vxls.not_run==1, arr.ind=TRUE)
+    vxls_not_run <- (log == 1) * 1
+    vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
   }
 
   # set voxel looping poarameters ------------------------------------------------
@@ -263,6 +263,7 @@ modelVoxel <- function(nii_data,
   ## -write log nii
   model.fxn <- function(X, ...) {
     coords <- vxl_ls[X, ]
+    print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])
     if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
     df <- pf
     df$nii <- numeric(nrow(df))
