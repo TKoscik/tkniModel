@@ -66,7 +66,8 @@ modelVoxel <- function(nii_data,
 
   ## Setup ordered factors (ordered/specific levels)
   # Expected format: c("variable:levels,labels,", etc...)
-   if (!missing(var_factor) && !is.null(var_factor)) {
+  if (!missing(var_factor) && !is.null(var_factor)) {
+    if (verbose) { message("Setting up variables as factors") }
     for (item in var_factor) {
       parts <- unlist(strsplit(item, ":"))
       var_name <- parts[1]      
@@ -93,6 +94,7 @@ modelVoxel <- function(nii_data,
 
   # Match DF data and NII data -------------------------------------------------
   ## 1. Parse id_var into a mapping (e.g., participant_id -> sub)
+  if (verbose) { message("Matching participants in DF and NII") }
   id_map <- list()
   for (item in id_var) {
     parts <- unlist(strsplit(item, ":"))
@@ -216,11 +218,14 @@ modelVoxel <- function(nii_data,
   vxl_ls <- which(mask!=0, arr.ind=TRUE)
 
    # initialize log file if it doesn't exist --------------------------------------
+  if (verbose) { message("Checking log file") }
   log.nii <- paste0(dir_scratch, "/log.nii")
   if (file.exists(log.nii) == FALSE || restart_log == TRUE) {
+    if (verbose) { message("Continuing prior run") }
     init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
     write.nii.volume(log.nii, vol.num=1, value=mask)
   } else {
+    if (verbose) { message("No log found, initializing...") }
     log <- read.nii.volume(log.nii,1)
     vxls.not_run <- (log == 1) * 1
     vxl_ls <- which(vxls.not_run==1, arr.ind=TRUE)
@@ -228,12 +233,18 @@ modelVoxel <- function(nii_data,
 
   # set voxel looping poarameters ------------------------------------------------
   n.vxls <- nrow(vxl_ls)
-  ## randomize order ---
-  if (rand_order) { vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ] }
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
+  if (verbose) { message(sprintf("Will process %d voxels.", n.vxls) }
+  
+  ## randomize order ---
+  if (rand_order) {
+    if (verbose) { message("Randomizing voxel order") }
+    vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
+  }  
 
   # Check that voxels are valid --------------------------------------------------
+  if (verbose) { message("Checking for invalid voxels") }
   valid_rows <- (vxl_ls[, 1] <= img_dims[1]) & 
                 (vxl_ls[, 2] <= img_dims[2]) & 
                 (vxl_ls[, 3] <= img_dims[3])
@@ -304,6 +315,7 @@ modelVoxel <- function(nii_data,
 
   # Create Final Output Directory ------------------------------------------
   # We use the user's model prefix to create a specific sub-folder
+  if (verbose) { message("Creating output directory") }
   final_output_dir <- file.path(dir_save, model_pfx)
   if (!dir.exists(final_output_dir)) {
     dir.create(final_output_dir, showWarnings = FALSE, recursive = TRUE)
@@ -315,7 +327,6 @@ modelVoxel <- function(nii_data,
   # Identify the results (everything in scratch except the temporary unzipped participant files)
   # Usually nifti.io creates files starting with the model_pfx
   result_files <- list.files(dir_scratch, pattern = paste0("^", model_pfx), full.names = TRUE)
-  
   if (length(result_files) > 0) {
     file.copy(result_files, final_output_dir, overwrite = TRUE)
   }
@@ -326,9 +337,7 @@ modelVoxel <- function(nii_data,
     # This removes the scratch folder and all unzipped participant copies
     unlink(dir_scratch, recursive = TRUE)
   }
-
   if (verbose) message("Voxelwise analysis complete!")
-  
   # Return the path to the results so the user can easily find them
   return(final_output_dir)
 }
