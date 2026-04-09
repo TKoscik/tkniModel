@@ -213,7 +213,7 @@ modelVoxel <- function(nii_data,
     pixdim   <- nifti.io::info.nii(pf$nii_file[1], "pixdim")
     orient   <- nifti.io::info.nii(pf$nii_file[1], "orient")
   }
-  vxl.ls <- which(mask!=0, arr.ind=TRUE)
+  vxl_ls <- which(mask!=0, arr.ind=TRUE)
 
    # initialize log file if it doesn't exist --------------------------------------
   log.nii <- paste0(dir_scratch, "/log.nii")
@@ -223,32 +223,32 @@ modelVoxel <- function(nii_data,
   } else {
     log <- read.nii.volume(log.nii,1)
     vxls.not_run <- (log == 1) * 1
-    vxl.ls <- which(vxls.not_run==1, arr.ind=TRUE)
+    vxl_ls <- which(vxls.not_run==1, arr.ind=TRUE)
   }
 
   # set voxel looping poarameters ------------------------------------------------
-  n.vxls <- nrow(vxl.ls)
+  n.vxls <- nrow(vxl_ls)
   ## randomize order ---
-  if (rand_order) { vxl.ls <- vxl.ls[sample(1:n.vxls, n.vxls, replace=F), ] }
+  if (rand_order) { vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ] }
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
 
   # Check that voxels are valid --------------------------------------------------
-  valid_rows <- (vxl.ls[, 1] <= img_dims[1]) & 
-                (vxl.ls[, 2] <= img_dims[2]) & 
-                (vxl.ls[, 3] <= img_dims[3])
+  valid_rows <- (vxl_ls[, 1] <= img_dims[1]) & 
+                (vxl_ls[, 2] <= img_dims[2]) & 
+                (vxl_ls[, 3] <= img_dims[3])
   valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
   n_dropped <- sum(!valid_rows)
   if (n_dropped > 0) {
     warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).", 
                     n_dropped, img_dims[1], img_dims[2], img_dims[3]))
-    vxl.ls <- vxl.ls[valid_rows, , drop = FALSE]
+    vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
   }
   
   # specify model function -------------------------------------------------------
   model.fxn <- function(X, ...) {
     ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    coords <- vxl.ls[X, ]
+    coords <- vxl_ls[X, ]
     if (do_debug) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
     df <- pf
     df$nii <- numeric(nrow(df))
@@ -278,7 +278,7 @@ modelVoxel <- function(nii_data,
     # Run voxels in parallel
     if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
     # Split indices into a list of chunks
-    chunks <- split(vxl.ls, cut(seq_along(vxl.ls), n_chunks, labels = FALSE))
+    chunks <- split(vxl_ls, cut(seq_along(vxl_ls), n_chunks, labels = FALSE))
     registerDoParallel(num_cores)
     invisible(
       foreach(chk_id = 1:length(chunks), .packages = all_libs, .export = ls(envir = environment())) %dopar% {
