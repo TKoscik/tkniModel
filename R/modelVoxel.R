@@ -263,7 +263,7 @@ modelVoxel <- function(nii_data,
   ## -write log nii
   model.fxn <- function(X, ...) {
     coords <- vxl_ls[X, ]
-    print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])
+    print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3]))
     if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
     df <- pf
     df$nii <- numeric(nrow(df))
