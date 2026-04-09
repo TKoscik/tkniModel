@@ -257,26 +257,22 @@ modelVoxel <- function(nii_data,
   }
   
   # specify model function -------------------------------------------------------
+  ## -load voxelwise data
+  ## -run user code (model_fcn)
+  ## -save voxelwise output table
+  ## -write log nii
   model.fxn <- function(X, ...) {
-    ## load VOXELWISE DATA - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     coords <- vxl_ls[X, ]
-    if (do_debug) { print(sprintf("VOXEL: %0.0f %0.0f %0.0f", coords[1], coords[2], coords[3])) }
+    if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
     df <- pf
     df$nii <- numeric(nrow(df))
     for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
-
-    ## Run USER code (model_fcn) - - - - - - - - - - - - - - - - - - - - - - - - -
     modelResult <- model_fcn(df)
-
-    ## Save voxelwise output table - - - - - - - - - - - - - - - - - - - - - - - -
     table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
                  do.log=TRUE, model.string=model_pfx,
                  img.dims=img_dims, pixdim=pixdim, orient=orient)
-  
-    if (do_debug) {
-      write.nii.voxel(log.nii, coords, 2)
-      print(">>>LOG Written")
-    }
+    write.nii.voxel(log.nii, coords, 2)
+    if (do_debug) { print(">>>LOG Written") }
   }
 
   do_debug=FALSE
