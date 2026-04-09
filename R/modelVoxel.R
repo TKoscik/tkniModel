@@ -235,7 +235,7 @@ modelVoxel <- function(nii_data,
   n.vxls <- nrow(vxl_ls)
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
-  if (verbose) { message(sprintf("Will process %d voxels.", n.vxls) }
+  if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
   
   ## randomize order ---
   if (rand_order) {
