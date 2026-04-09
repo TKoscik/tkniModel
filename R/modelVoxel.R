@@ -236,7 +236,7 @@ modelVoxel <- function(nii_data,
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
   if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
-  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir-scratch))
+  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir_scratch))
   ## randomize order ---
   if (rand_order) {
     if (verbose) { message("Randomizing voxel order") }
@@ -255,7 +255,7 @@ modelVoxel <- function(nii_data,
                     n_dropped, img_dims[1], img_dims[2], img_dims[3]))
     vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
   }
-  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir-scratch))
+  write.table(vxl_ls, sprintf("%s_startVxlLS.txt", dir_scratch))
   # specify model function -------------------------------------------------------
   ## -load voxelwise data
   ## -run user code (model_fcn)
