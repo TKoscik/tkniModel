@@ -262,18 +262,9 @@ modelVoxel <- function(nii_data,
   ## -save voxelwise output table
   ## -write log nii
   model.fxn <- function(coords, df, ...) {
-    #coords <- vxl_ls[X, ]
-    #if (do_debug) { print(sprintf("VOXEL: %d %d %d", coords[1], coords[2], coords[3])) }
-    #df <- pf
-    #df$nii <- numeric(nrow(df))
     for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
     modelResult <- model_fcn(df)
     return(modelResult)
-    #table.to.nii(in.table = modelResult, coords=coords, save.dir=dir_scratch,
-    #             do.log=TRUE, model.string=model_pfx,
-    #             img.dims=img_dims, pixdim=pixdim, orient=orient)
-    #write.nii.voxel(log.nii, coords, 2)
-    #if (do_debug) { print(">>>LOG Written") }
   }
 
   do_debug=FALSE
@@ -293,10 +284,7 @@ modelVoxel <- function(nii_data,
     #chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
     #invisible(
-      foreach(chk_id = 1:num_cores,
-              .packages = all_libs,
-              .export = ls(envir = environment()),
-              .errorhandling = "pass") %dopar% {
+      foreach(chk_id = 1:num_cores, .packages = all_libs) %dopar% {
         worker_start <- Sys.time()
         vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
         n_in_chunk <- nrow(vxl_chunk)
