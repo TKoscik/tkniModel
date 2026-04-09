@@ -284,7 +284,7 @@ modelVoxel <- function(nii_data,
       message("DEBUG DONE")
   } else {
     # Run voxels in parallel
-    if (verbose) message(sprintf("Starting voxelwise models on %d cores...", num_cores))
+    if (verbose) { message(sprintf("Starting voxelwise models on %d cores...", num_cores))}
     proc_start <- Sys.time()
     # Split indices into a list of chunks
     chunker <- round(seq(1, n.vxls, length.out=num_cores+1))
@@ -292,13 +292,13 @@ modelVoxel <- function(nii_data,
     chunk_stop <- c(chunker[2:(length(chunker)-1)] - 1, chunker[length(chunker)])
     #chunks <- split(vxl_ls, cut(seq_along(vxl_ls), num_cores, labels = FALSE))
     registerDoParallel(num_cores)
-    invisible(
+    #invisible(
       foreach(chk_id = 1:num_cores,
               .packages = all_libs,
               .export = ls(envir = environment()),
               .errorhandling = "pass") %dopar% {
         worker_start <- Sys.time()
-        vxl_chunk <- vxl.ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
+        vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
         n_in_chunk <- nrow(vxl_chunk)
         worker_id <- sprintf("worker_%02d", chk_id)
         for (i in 1:n_in_chunk) {
@@ -330,7 +330,7 @@ modelVoxel <- function(nii_data,
         elapsed <- difftime(worker_end, worker_start, units = "auto")
         message(sprintf("[%s] COMPLETED. Total elapsed time: %s", worker_id, format(elapsed)))
       }
-    )
+    #)
     #invisible(foreach(X=1:n.vxls, .packages=all_libs, .export=ls(envir=environment())) %dopar% model.fxn(X))
     stopImplicitCluster() # Stop parallelization
     proc_stop <- Sys.time()
