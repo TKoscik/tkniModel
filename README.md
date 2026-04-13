@@ -4,26 +4,30 @@
 
 ## The Workflow
 
-The package is designed to be used in three distinct phases:
+The package is designed to be used in four integrated phases:
 
 1.  **Voxel-wise Modeling (`modelVoxel`)**: Connects your BIDS-formatted NIfTI data to an R data frame, manages fast I/O via scratch directories, and runs parallel models (LM, LMER, etc.) across the brain.
-2.  **Clustering & Extraction (`modelCluster`)**: Identifies significant clusters based on voxel-wise and peak thresholds, sorts them by size, and generates summary statistics and labeled NIfTI maps.
-3.  **Visualization (`drawOverlay` & `drawEffect`)**: Produces publication-quality figures, including multi-layered brain montages with real-world coordinates and adjusted effect plots that account for random-effects variance.
+2.  **Clustering & Thresholding (`modelCluster`)**: Identifies significant clusters based on voxel-wise and peak thresholds. It generates summary statistics and produces labeled NIfTI masks for further analysis.
+3.  **Advanced Visualization (`drawMontage` & `overlayPNG`)**: Creates publication-quality, physically scaled figures. Features include multi-layer stacking (anatomy + stats + ROIs), automated slice selection, laterality arrows, world coordinates, and flexible color bar placement.
+4.  **Region of Interest Extraction (`getNIIData`)**: "Closes the loop" by extracting raw participant data from significant clusters or specific voxel coordinates. Optimized for speed using in-memory masking to prepare data for final statistical reporting and plotting.
+
 
 ---
 
 ## Core Functions
 
 ### Analysis & Processing
-*   **`modelVoxel()`**: The primary engine. It maps participant metadata to NIfTI files, handles local decompression on compute nodes, and executes user-defined R functions across every voxel.
-*   **`modelCluster()`**: A comprehensive thresholding pipeline. It identifies contiguous clusters, applies size and peak-significance filters, and renumbers clusters for easy reporting.
+*   **`modelVoxel()`**: The primary engine. It maps participant metadata to BIDS-formatted NIfTI files, handles local decompression on compute nodes, and executes user-defined R statistical functions across every voxel in parallel.
+*   **`modelCluster()`**: A comprehensive thresholding pipeline. It identifies significant clusters, applies extent and peak-significance filters, and generates renumbered NIfTI masks and summary reports.
+*   **`getNIIData()`**: An optimized extraction tool that pulls participant values from labeled clusters or specific coordinates. Uses in-memory masking to maximize speed during post-hoc analysis.
 *   **`cluster3D()`**: A memory-efficient 3D seed-fill algorithm for identifying connected components using 6, 18, or 26-neighbor connectivity.
-*   **`clusterTable()`**: Extracts peak intensities, world coordinates, and center-of-gravity stats for labeled clusters.
+*   **`clusterTable()`**: Extracts peak intensities, world coordinates (mm), and center-of-gravity statistics for significant clusters.
 
 ### Visualization
-*   **`drawOverlay()`**: Generates "lightbox" montage figures. Automatically finds slices with data, stacks multiple statistical layers over anatomy, and calculates coordinate labels from NIfTI `sform` headers.
-*   **`drawEffect()`**: Plots the relationship between behavioral variables and brain data. For mixed-effects models, it "partials out" random effects to show the true fixed-effect relationship.
-*   **`slicesToRaster()`**: A utility that transforms 3D volumes into 2D montage grids compatible with `ggplot2`.
+*   **`drawMontage()`**: The master conductor for publication figures. Automatically parses layout strings (e.g., `5:x;5:y;5:z`) and arranges multi-layered composites into publication-ready grids.
+*   **`overlayPNG()`**: A high-performance compositor that stacks anatomical background, statistical foregrounds, and ROI outlines. Handles transparency and physical scaling (mm-to-pixel) natively.
+*   **`slicePNG()`**: The core rendering engine. Generates 2D slices with baked-in world coordinates, orientation arrows ($\leftarrow$ L/R), and scale bars. Optimized to process multiple slices and planes in a single pass.
+*   **`drawEffect()`**: Plots relationships between behavioral variables and brain data. For mixed-effects models, it can "partial out" random effects to visualize the underlying fixed-effect relationships.
 
 ---
 
