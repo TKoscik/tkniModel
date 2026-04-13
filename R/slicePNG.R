@@ -1,9 +1,6 @@
-slicePNG <- function(nii_data,
-                     nii_vol = 1,
-                     nii_mask = NULL,
-                     mask_vol = 1,
-                     plane = "coronal",
-                     slice,
+slicePNG <- function(nii_data, nii_vol = 1,
+                     nii_mask = NULL, mask_vol = 1,
+                     slice_x = NULL, slice_y = NULL, slice_z = NULL,
                      bg_color = "black",
                      color = c("black", "white"),
                      threshold_pct = NULL,   # e.g., c(0.025, 0.975)
@@ -22,38 +19,28 @@ slicePNG <- function(nii_data,
   if (!is.null(threshold_pct) && !is.null(threshold_value)) {
     stop("Provide either threshold_pct OR threshold_value, not both.")
   }
+  if (is.null(slice_x) & is.null(slice_y) & is.null(slice_z)) {
+    stop("You must provide slices to plot.")
+  }
 
   # 1. Setup Scratch and Local Files ------------------------------------------
   if (!dir.exists(dir_scratch)) dir.create(dir_scratch, recursive = TRUE)
-
-  prep_file <- function(path, tag) {
-    if (is.null(path) || path == "none") return(NULL)
-    dest <- file.path(dir_scratch, paste0(tag, "_", gsub("\\.gz$", "", basename(path))))
-    if (!file.exists(dest)) {
-      if (grepl("\\.gz$", path)) {
-        R.utils::gunzip(path, destname = dest, remove = FALSE, overwrite = TRUE)
-      } else {
-        file.copy(path, dest, overwrite = TRUE)
-      }
-    }
-    return(dest)
-  }
-
-  local_nii <- prep_file(nii_data, "data")
-  local_mask <- prep_file(nii_mask, "mask")
+  local_nii <- prepNII(nii_data, "data", dir_scratch)
+  local_mask <- prepNII(nii_mask, "mask", dir_scratch)
 
   # 2. Get Metadata and Thresholds --------------------------------------------
   spacing <- nifti.io::info.nii(local_nii, "spacing")
   img_vol <- nifti.io::read.nii.volume(local_nii, nii_vol)
   dims <- dim(img_vol)
 
+  # 3. Load mask ---------------------------------------------------------------
   m_vol <- NULL
   if (!is.null(local_mask)) {
     m_vol <- nifti.io::read.nii.volume(local_mask, mask_vol)
     m_vol <- ((m_vol != 0) & (!is.na(img_vol)))*1
   }
 
-  # 3. Resolve Thresholds -----------------------------------------------------
+  # 4. Resolve Thresholds ------------------------------------------------------
   if(!is.null(local_mask)) {
     vals <- img_vol[m_vol != 0]
   } else {
@@ -70,228 +57,227 @@ slicePNG <- function(nii_data,
     if (!is.na(threshold_value[2])) { v_max <- threshold_value[2] }
   }
 
-  # 3. Extract Slice and Calculate Physical Dimensions ------------------------
-  if (plane == "coronal") {
-    slice_data <- img_vol[, slice, ]
-    phys_w <- dims[1] * spacing[1]; phys_h <- dims[3] * spacing[3]
-  } else if (plane == "axial") {
-    slice_data <- img_vol[, , slice]
-    phys_w <- dims[1] * spacing[1]; phys_h <- dims[2] * spacing[2]
-  } else {
-    slice_data <- img_vol[slice, , ]
-    phys_w <- dims[2] * spacing[2]; phys_h <- dims[3] * spacing[3]
-  }
+  # 5. Create the slice extraction loop ----------------------------------------
+  work_list <- list()
+  if(!is.null(slice_x)) work_list <- c(work_list, lapply(slice_x, function(s) list(p="sagittal", s=s)))
+  if(!is.null(slice_y)) work_list <- c(work_list, lapply(slice_y, function(s) list(p="coronal", s=s)))
+  if(!is.null(slice_z)) work_list <- c(work_list, lapply(slice_z, function(s) list(p="axial", s=s)))
+  plane_to_arg <- list(sagittal = "slice_x", coronal = "slice_y", axial = "slice_z")
+  output_paths <- character()
 
-  if (is.null(local_mask)) {
-    m_vol <- (slice_data[slice_data >= min(c(v_min, v_max)) & slice_data <= max(c(v_min, v_max))] != 0) * 1
-  }
-
-  # 4. Generate Main Image -----------------------------------------------------
-  clamped_data <- slice_data
-  clamped_data[clamped_data < v_min] <- v_min
-  clamped_data[clamped_data > v_max] <- v_max
-  norm_data <- (clamped_data - v_min) / (v_max - v_min)
-
-  pal <- grDevices::colorRampPalette(color)(256)
-  color_indices <- findInterval(norm_data, seq(0, 1, length.out = 256), all.inside = TRUE)
-
-  # This is your RGB hex matrix (e.g., "#FF0000")
-  hex_mx <- matrix(pal[color_indices], nrow = nrow(slice_data))
-  hex_mx[is.na(hex_mx)] <- "#000000"
-
-  #  Build the Alpha Channel from the Mask
-  m_slice <- switch(plane,
-                    "sagittal" = m_vol[slice, , ],
-                    "coronal"  = m_vol[, slice, ],
-                    "axial"    = m_vol[, , slice])
-  # Create alpha values: "FF" (opaque) for data, "00" (transparent) for background
-  alpha_mx <- matrix("00", nrow = nrow(slice_data), ncol = ncol(slice_data))
-  alpha_mx[m_slice != 0] <- "FF"
-
-  # Combine RGB + Alpha into a single RGBA Matrix
-  # This results in hex codes like "#FF0000FF" (Opaque Red) or "#FF000000" (Transparent)
-  rgba_mx <- matrix(paste0(hex_mx, alpha_mx), nrow = nrow(slice_data))
-
-  # Create Magick Image and Composite over bg_color
-  # Create the brain data with transparency ALREADY BUILT IN
-  data_img <- magick::image_read(rgba_mx)
-  data_img <- magick::image_flop(magick::image_rotate(data_img, 270))
-
-  target_w <- round(phys_w * scale)
-  target_h <- round(phys_h * scale)
-  data_img <- magick::image_resize(data_img, geometry = magick::geometry_size_pixels(width = target_w, height = target_h, preserve_aspect = FALSE))
-
-  # Create the final canvas and layer the pre-masked data over it
-  bg_canvas <- magick::image_blank(target_w, target_h, color = bg_color)
-  img <- magick::image_composite(bg_canvas, data_img, operator = "Over")
-
-
-    # 5. Filenames --------------------------------------------------------------
-  if (is.null(file_name)) {
-    base_name <- sprintf("slice_%s_%03d", plane, slice)
-  } else {
-    base_name <- gsub("\\.png$", "", file_name)
-  }
-
-  # 6. Generate Alpha Mask ----------------------------------------------------
-  if (draw_mask) {
-    mask_hex <- matrix("#000000", nrow = nrow(m_slice), ncol = ncol(m_slice))
-    mask_hex[m_slice != 0] <- "#FFFFFF"
-    mask_img <- magick::image_read(mask_hex)
-    mask_img <- magick::image_flop(magick::image_rotate(mask_img, 270))
-    mask_img <- magick::image_resize(mask_img,
-                                     geometry = magick::geometry_size_pixels(target_w, target_h, FALSE))
-    # Force to grayscale to ensure CopyOpacity treats it as a single alpha channel
-    mask_img <- magick::image_convert(mask_img, colorspace = "gray")
-    magick::image_write(mask_img, path = file.path(dir_save, paste0(base_name, "_mask.png")))
-  }
-
-  # 7. Physical Scaling -------------------------------------------------------
-  target_w <- round(phys_w * scale)
-  target_h <- round(phys_h * scale)
-  img <- magick::image_resize(img, geometry = magick::geometry_size_pixels(width = target_w, height = target_h, preserve_aspect = FALSE))
-
-  # 8. Add Annotations --------------------------------------------------------
+  # calculate dimensions for each plane -----------------------------------------
+  p_dims <- list(
+    sagittal = list(w = dims[2] * spacing[2], h = dims[3] * spacing[3]),
+    coronal  = list(w = dims[1] * spacing[1], h = dims[3] * spacing[3]),
+    axial    = list(w = dims[1] * spacing[1], h = dims[2] * spacing[2])
+  )
   # Calculate font sizing based on scale
   base_font <- max(10, round(10 * scale))
   padding <- 15
 
-  if (draw_label_layer) {
-    label_layer <- magick::image_blank(width = target_w, height = target_h, color = "none")
-  }
-
-  # A. Bottom Right: Scale Bar (15% width)
+  # 5. Generate Reusable Templates (Side and Scale) ----------------------------
+  ## Scale Labels
   if (draw_scale) {
-    target_mm <- phys_w * 0.15
-    scale_len_mm <- round(target_mm / 5) * 5
-    if (scale_len_mm == 0) scale_len_mm <- 5
-    bar_w_px <- scale_len_mm * scale
-    bar_h_px <- max(1, round(0.3 * scale))
-    if (draw_label_layer) {
-      label_layer <- magick::image_draw(label_layer)
-    } else {
-      img <- magick::image_draw(img)
-    }
-    symbols(target_w - padding - (bar_w_px/2),
-            target_h - padding - (base_font * 1.5) - (bar_h_px/2),
-            rectangles = matrix(c(bar_w_px, bar_h_px), ncol=2),
-            inches = FALSE, add = TRUE, bg = "white", fg = NA)
-    dev.off()
-
-    # Label UNDER the line
-    if (draw_label_layer) {
-      label_layer <- magick::image_annotate(label_layer, sprintf("%g mm", scale_len_mm),
-                                    gravity = "southeast", color = "white", size = base_font,
-                                    location = sprintf("+%d+%d", round(padding + (bar_w_px/2) - (base_font)), padding))
-    } else {
-      img <- magick::image_annotate(img, sprintf("%g mm", scale_len_mm),
-                                    gravity = "southeast", color = "white", size = base_font,
-                                    location = sprintf("+%d+%d", round(padding + (bar_w_px/2) - (base_font)), padding))
+    for (p in names(p_dims)) {
+      arg_name <- plane_to_arg[[p]]
+      if (!is.null(get(arg_name))) {
+        tw <- round(p_dims[[p]]$w * scale); th <- round(p_dims[[p]]$h * scale)
+        # Calculate bar physics
+        target_mm <- p_dims[[p]]$w * 0.15
+        scale_len_mm <- round(target_mm / 5) * 5
+        if (scale_len_mm == 0) scale_len_mm <- 5
+        bar_w_px <- scale_len_mm * scale
+        bar_h_px <- max(1, round(0.3 * scale))
+        c_img <- magick::image_blank(tw, th, color = "none")
+        c_img <- magick::image_draw(c_img) # This is the missing step!
+        symbols(tw - padding - (bar_w_px/2),
+                th - padding - (base_font * 1.5) - (bar_h_px/2),
+                rectangles = matrix(c(bar_w_px, bar_h_px), ncol=2),
+                inches = FALSE, add = TRUE, bg = "white", fg = NA)
+        dev.off()
+        c_img <- magick::image_annotate(c_img, sprintf("%g mm", scale_len_mm),
+                                        gravity = "southeast", color = "white", size = base_font,
+                                        location = sprintf("+%d+%d", round(padding + (bar_w_px/2) - (base_font)), padding))
+        magick::image_write(c_img, file.path(dir_scratch, sprintf("label_%s_scale.png", p)))
+        if (draw_label_layer) {
+          magick::image_write(c_img, file.path(dir_save, sprintf("label_%s_scale.png", p)))
+        }
+      }
     }
   }
 
-  # B. Bottom Left: L/R Side Label
+  ## Side labels
   if (draw_side) {
-    side_label <- ""
     srow_x <- unlist(nifti.io::info.nii(local_nii, "srow_x"))
-    srow_y <- unlist(nifti.io::info.nii(local_nii, "srow_y"))
-    srow_z <- unlist(nifti.io::info.nii(local_nii, "srow_z"))
-    if (plane %in% c("coronal", "axial")) {
-      side_label <- if (srow_x[1] > 0) "R" else "L"
-    } else if (plane == "sagittal") {
-      # For sagittal, the horizontal axis is Voxel-Y (Posterior -> Anterior)
-      side_label <- if (srow_y[2] > 0) "A" else "P"
-    }
-    if (draw_label_layer) {
-      label_layer <- magick::image_annotate(label_layer, side_label, gravity = "southwest",
-                                            location = sprintf("+%d+%d", padding, padding),
-                                            color = "white", size = base_font * 1.2, weight = 700)
-    } else {
-      img <- magick::image_annotate(img, side_label, gravity = "southwest",
-                                    location = sprintf("+%d+%d", padding, padding),
-                                    color = "white", size = base_font * 1.2, weight = 700)
+    side_char <- if (srow_x[1] > 0) "R" else "L"
+    label_text <- paste0("\u2190 ", side_char) # "<- L" or "<- R"
+    for (p in c("coronal", "axial")) {
+      arg_name <- plane_to_arg[[p]]
+      if (!is.null(get(arg_name))) {
+        tw <- round(p_dims[[p]]$w * scale)
+        th <- round(p_dims[[p]]$h * scale)
+        side_img <- magick::image_blank(tw, th, color = "none")
+        side_img <- magick::image_annotate(side_img, label_text,
+          gravity = "northeast", color = "white", size = base_font * 1.5,
+          location = sprintf("+%d+%d", padding, padding))
+        magick::image_write(side_img, file.path(dir_scratch, sprintf("label_%s_side.png", p)))
+        if (draw_label_layer) {
+          magick::image_write(side_img, file.path(dir_save, sprintf("label_%s_side.png", p)))
+        }
+      }
     }
   }
 
-  # C. Top Left: Slice Location (World mm)
-  if (draw_coords) {
-    # srow_x = Row 1, srow_y = Row 2, srow_z = Row 3
-    hdr_field <- switch(plane, "sagittal"="srow_x", "coronal"="srow_y", "axial"="srow_z")
-    tform <- unlist(nifti.io::info.nii(local_nii, hdr_field))
-    # Real world mm = (index - 1) * step + offset
-    world_mm <- round((slice - 1) * tform[1] + tform[4], 1)
-    if (draw_label_layer) {
-      label_layer <- magick::image_annotate(label_layer, sprintf("%g mm", world_mm),
-                                            gravity = "northwest", location = sprintf("+%d+%d", padding, padding),
-                                            color = "white", size = base_font)
+  # Loop over slice generation --------------------------------------------------
+  for (item in work_list) {
+    curr_plane <- item$p
+    curr_slice <- item$s
+
+    # A. Extract Slice and Calculate Physical Dimensions ------------------------
+    if (curr_plane == "coronal") {
+      slice_data <- img_vol[, curr_slice, ]
+      phys_w <- dims[1] * spacing[1]; phys_h <- dims[3] * spacing[3]
+    } else if (curr_plane == "axial") {
+      slice_data <- img_vol[, , curr_slice]
+      phys_w <- dims[1] * spacing[1]; phys_h <- dims[2] * spacing[2]
     } else {
+      slice_data <- img_vol[curr_slice, , ]
+      phys_w <- dims[2] * spacing[2]; phys_h <- dims[3] * spacing[3]
+    }
+
+    if (is.null(local_mask)) {
+      m_vol <- (slice_data[slice_data >= min(c(v_min, v_max)) & slice_data <= max(c(v_min, v_max))] != 0) * 1
+    }
+
+    # B. Generate Main Image ---------------------------------------------------
+    ## This is your RGB hex matrix (e.g., "#FF0000")
+    clamped_data <- slice_data
+    clamped_data[clamped_data < v_min] <- v_min
+    clamped_data[clamped_data > v_max] <- v_max
+    norm_data <- (clamped_data - v_min) / (v_max - v_min)
+    pal <- grDevices::colorRampPalette(color)(256)
+    color_indices <- findInterval(norm_data, seq(0, 1, length.out = 256), all.inside = TRUE)
+    hex_mx <- matrix(pal[color_indices], nrow = nrow(slice_data))
+    hex_mx[is.na(hex_mx)] <- "#000000"
+
+    # C. Build the Alpha Channel from the Mask ---------------------------------
+    ## Create alpha values: "FF" (opaque) for data, "00" (transparent) for background
+    m_slice <- switch(curr_plane,
+                      "sagittal" = m_vol[curr_slice, , ],
+                      "coronal"  = m_vol[, curr_slice, ],
+                      "axial"    = m_vol[, , curr_slice])
+    alpha_mx <- matrix("00", nrow = nrow(slice_data), ncol = ncol(slice_data))
+    alpha_mx[m_slice != 0] <- "FF"
+
+    # D. Combine RGB + Alpha into a single RGBA Matrix -------------------------
+    # This results in hex codes like "#FF0000FF" (Opaque Red) or "#FF000000" (Transparent)
+    rgba_mx <- matrix(paste0(hex_mx, alpha_mx), nrow = nrow(slice_data))
+    # Create Magick Image and Composite over bg_color, brain data with transparency ALREADY BUILT IN
+    data_img <- magick::image_read(rgba_mx)
+    data_img <- magick::image_flop(magick::image_rotate(data_img, 270))
+
+    # E. Resize Image ----------------------------------------------------------
+    target_w <- round(phys_w * scale)
+    target_h <- round(phys_h * scale)
+    data_img <- magick::image_resize(data_img,
+      geometry = magick::geometry_size_pixels(width = target_w,
+                                              height = target_h,
+                                              preserve_aspect = FALSE))
+
+    # F. Create the final canvas and layer the pre-masked data over it ---------
+    bg_canvas <- magick::image_blank(target_w, target_h, color = bg_color)
+    img <- magick::image_composite(bg_canvas, data_img, operator = "Over")
+
+    # G. Filenames -------------------------------------------------------------
+    if (is.null(file_name)) {
+      base_name <- sprintf("slice_%s_%03d", curr_plane, curr_slice)
+    } else {
+      base_name <- gsub("\\.png$", "", file_name)
+    }
+
+    # I. Add Annotations -------------------------------------------------------
+    if (!draw_label_layer) {
+      ## add scale annotation
+      if (draw_scale) {
+        scale_tmp <- magick::image_read(file.path(dir_scratch, sprintf("label_%s_scale.png", curr_plane)))
+        img <- magick::image_composite(img, scale_tmp, operator = "Over")
+      }
+      ## add side annotation
+      if (draw_side & curr_plane %in% c("coronal", "axial")) {
+        side_tmp <- magick::image_read(file.path(dir_save, sprintf("label_%s_scale.png", curr_plane)))
+        img <- magick::image_composite(img, side_tmp, operator = "Over")
+      }
+    }
+    ## Add slice Location (World mm)
+    if (draw_coords) {
+      hdr_field <- switch(curr_plane, "sagittal"="srow_x", "coronal"="srow_y", "axial"="srow_z")
+      tform <- unlist(nifti.io::info.nii(local_nii, hdr_field))
+      world_mm <- round((curr_slice - 1) * tform[1] + tform[4], 1)
       img <- magick::image_annotate(img, sprintf("%g mm", world_mm),
-                                    gravity = "northwest", location = sprintf("+%d+%d", padding, padding),
-                                    color = "white", size = base_font)
+        gravity = "northwest", location = sprintf("+%d+%d", padding, padding),
+        color = "white", size = base_font)
     }
+
+    # J. Setup base name -------------------------------------------------------
+    if (is.null(file_name)) {
+      base_name <- sprintf("slice_%s_%03d", curr_plane, curr_slice)
+    } else {
+      base_name <- paste0(tools::file_path_sans_ext(file_name), "_", curr_plane, "_", curr_slice)
+    }
+
+    # K. Generate Alpha Mask, for later compositing ----------------------------
+    if (draw_mask) {
+      mask_hex <- matrix("#000000", nrow = nrow(m_slice), ncol = ncol(m_slice))
+      mask_hex[m_slice != 0] <- "#FFFFFF"
+      mask_img <- magick::image_read(mask_hex)
+      mask_img <- magick::image_flop(magick::image_rotate(mask_img, 270))
+      mask_img <- magick::image_resize(mask_img,
+                                       geometry = magick::geometry_size_pixels(target_w, target_h, FALSE))
+      mask_img <- magick::image_convert(mask_img, colorspace = "gray")
+      magick::image_write(mask_img, path = file.path(dir_save, paste0(base_name, "_mask.png")))
+    }
+
+    # L. Save output -----------------------------------------------------------
+    out_path <- file.path(dir_save, paste0(base_name, ".png"))
+    output_paths <- c(output_paths, out_path)
+    magick::image_write(img, path = out_path, format = "png")
   }
 
-  # 9. Save -------------------------------------------------------------------
-  if (is.null(file_name)) {
-    base_name <- sprintf("slice_%s_%03d", plane, slice)
-  } else {
-    base_name <- gsub("\\.png$", "", file_name)
-  }
-
-  out_path <- file.path(dir_save, paste0(base_name, ".png"))
-  magick::image_write(img, path = out_path, format = "png")
-
-  # 10. Generate the Color Bar PNG (Optional) ----------------------------------
-  # 2. Generate the Color Bar PNG ---------------------------------------------
+  # Generate the Color Bar PNG (Optional) ----------------------------------
   if (!is.null(draw_cbar)) {
     cbar_res <- 256
     pal <- grDevices::colorRampPalette(color)(cbar_res)
-    base_font <- max(10, round(10 * scale))
-
     label_min <- sprintf("%.2f", v_min)
     label_max <- sprintf("%.2f", v_max)
-    bg_color <- color[1] # Usually black
-
-    # Determine the "long" dimension based on the requested orientation
-    # If user wants vertical, the 'length' should match the target_h
+    cbar_bg <- bg_color
     target_len <- if(draw_cbar == "vertical") target_h else target_w
-
-    # 1. Create a Horizontal Color Strip (50% of the target length)
     strip_w  <- round(target_len * 0.5)
     strip_h  <- round(12 * scale)
     cbar_mx    <- matrix(pal, nrow = 1)
     cbar_strip <- magick::image_read(cbar_mx)
     cbar_strip <- magick::image_resize(cbar_strip,
-                                       geometry = magick::geometry_size_pixels(width = strip_w,
-                                                                               height = strip_h,
-                                                                               preserve_aspect = FALSE))
-
-    # 2. Extend Canvas to full target length and add text at ends
+      geometry = magick::geometry_size_pixels(width = strip_w,
+                                              height = strip_h,
+                                              preserve_aspect = FALSE))
     cbar_img <- magick::image_extent(cbar_strip,
                                      geometry = sprintf("%dx%d", target_len, strip_h),
-                                     gravity = "Center", color = bg_color)
-
-    # Labels on the horizontal version
+                                     gravity = "Center", color = cbar_bg)
+    cbar_img <- magick::image_convert(cbar_img, type = "truecoloralpha")
     cbar_img <- magick::image_annotate(cbar_img, label_min, gravity = "west",
                                        location = "+5+0", color = "white", size = base_font)
     cbar_img <- magick::image_annotate(cbar_img, label_max, gravity = "east",
                                        location = "+5+0", color = "white", size = base_font)
-
-    # 3. If vertical requested, rotate the whole thing
     if (draw_cbar == "vertical") {
-      # Rotate 270 (90 deg clockwise) so Max is at the Top, Min is at the Bottom
       cbar_img <- magick::image_rotate(cbar_img, 270)
-      # Note: image_rotate swaps width/height, so it now matches target_h perfectly
     }
-
-    cbar_out_path <- file.path(dir_save, paste0(base_name, "_cbar.png"))
+    if (is.null(file_name)) {
+      cbar_name <- "slice_cbar.png"
+    } else {
+      cbar_name <- sprintf("%s_cbar.png", tools::file_path_sans_ext(file_name))
+    }
+    cbar_out_path <- file.path(dir_save, cbar_name)
     magick::image_write(cbar_img, path = cbar_out_path, format = "png")
   }
 
-  if (draw_label_layer) {
-    layer_out_path <- file.path(dir_save, paste0(base_name, "_labels.png"))
-    magick::image_write(label_layer, path = layer_out_path, format = "png")
-  }
-
-  return(out_path)
+  return(output_paths)
 }
