@@ -14,15 +14,15 @@ modelVoxel <- function(nii_data,
                        verbose=TRUE,
                        debug=NA,
                        cleanup=TRUE) {
-    
+
   # check for missing data -----------------------------------------------------
   if (verbose) { message("Checking required inputs") }
   missing_input <- FALSE
   if (missing(nii_data)) { message("Error: 'nii_data' is required."); missing_input <- TRUE }
   if (missing(df_data)) { message("Error: 'df_data' is required."); missing_input <- TRUE }
   if (missing(model_fcn)) { message("Error: 'model_fcn' is required."); missing_input <- TRUE }
-  if (missing_input) { 
-    stop("Missing required arguments. Please check the messages above and try again.", call. = FALSE) 
+  if (missing_input) {
+    stop("Missing required arguments. Please check the messages above and try again.", call. = FALSE)
   }
 
   if (missing(model_pfx)) { model_pfx <- sprintf("model_%s", format(Sys.time(), "%Y%m%dT%H%M%S"))}
@@ -32,7 +32,7 @@ modelVoxel <- function(nii_data,
   if (is.null(dir_scratch)) { dir_scratch <- file.path(dir_save, "scratch") }
   if (!dir.exists(dir_scratch)) { dir.create(dir_scratch, recursive = TRUE) }
   if (verbose) { message(sprintf("Work directory set to: %s", dir_scratch)) }
-  
+
   # load required libraries ------------------------------------------------------
   if (verbose) { message("Loading libraries") }
   core_libs <- c("doParallel", "nifti.io", "tools", "R.utils")
@@ -70,21 +70,21 @@ modelVoxel <- function(nii_data,
     if (verbose) { message("Setting up variables as factors") }
     for (item in var_factor) {
       parts <- unlist(strsplit(item, ":"))
-      var_name <- parts[1]      
+      var_name <- parts[1]
       if (var_name %in% names(pf)) {
         if (length(parts) == 1) {
           # Case: "sex" (Just convert to factor)
-          pf[[var_name]] <- as.factor(pf[[var_name]])          
+          pf[[var_name]] <- as.factor(pf[[var_name]])
         } else if (length(parts) == 2) {
           # Case: "sex:male,female"
           levs <- unlist(strsplit(parts[2], ","))
-          pf[[var_name]] <- factor(pf[[var_name]], levels = levs)          
+          pf[[var_name]] <- factor(pf[[var_name]], levels = levs)
         } else if (length(parts) == 3) {
           # Case: "sex:1,2:male,female"
           levs   <- unlist(strsplit(parts[2], ","))
           labls  <- unlist(strsplit(parts[3], ","))
           pf[[var_name]] <- factor(pf[[var_name]], levels = levs, labels = labls)
-        }        
+        }
         if (verbose) { message(sprintf("Processed factor: %s", var_name))}
       } else {
         warning(sprintf("Variable '%s' not found in data frame.", var_name))
@@ -112,9 +112,9 @@ modelVoxel <- function(nii_data,
   # nii_data can be a directory "path/to/data" or "path/to/data:_T1w"
   nii_parts <- unlist(strsplit(nii_data, ":"))
   search_dir <- nii_parts[1]
-  file_suffix <- if (length(nii_parts) > 1) nii_parts[2] else ""  
+  file_suffix <- if (length(nii_parts) > 1) nii_parts[2] else ""
   if (dir.exists(search_dir)) {
-    all_files <- list.files(search_dir, pattern = "\\.nii(\\.gz)?$", 
+    all_files <- list.files(search_dir, pattern = "\\.nii(\\.gz)?$",
                             full.names = TRUE, recursive = TRUE)
   } else {
     # If nii_data was already a list of files
@@ -122,7 +122,7 @@ modelVoxel <- function(nii_data,
   }
 
   # 3. Match each row in 'pf' to exactly one file
-  pf$nii_file <- as.character(NA)  
+  pf$nii_file <- as.character(NA)
   for (i in 1:nrow(pf)) {
     # Build a regex that matches ALL id_vars for this row
     # Example: sub-1234.*ses-5678.*aid-999.*_T1w.nii
@@ -133,18 +133,18 @@ modelVoxel <- function(nii_data,
       # BIDS flags are usually flag-value
       regex_parts <- c(regex_parts, sprintf("%s-%s", flag, val))
     }
-    
+
     # Combine parts with .* to allow any flags in between
     # Add the user-specified suffix and the nifti extension
-    match_pattern <- paste0(paste(regex_parts, collapse = ".*"), 
+    match_pattern <- paste0(paste(regex_parts, collapse = ".*"),
                             ".*", file_suffix, "\\.nii(\\.gz)?$")
-    
+
     matches <- all_files[grepl(match_pattern, all_files)]
-    
+
     if (length(matches) == 0) {
       warning(sprintf("No matching NIfTI found for row %d (Pattern: %s)", i, match_pattern))
     } else if (length(matches) > 1) {
-      stop(sprintf("Multiple files found for row %d: %s. Pattern was: %s", 
+      stop(sprintf("Multiple files found for row %d: %s. Pattern was: %s",
                    i, paste(basename(matches), collapse=", "), match_pattern))
     } else {
       pf$nii_file[i] <- matches
@@ -155,44 +155,62 @@ modelVoxel <- function(nii_data,
   pf <- pf[!is.na(pf$nii_file), ]
   if (nrow(pf) == 0) { stop("Dataset is empty, please check inputs") }
 
-  # Transfer & Decompress Participant Files ------------------------------------ 
-  for (i in 1:nrow(pf)) {
-    original_path <- pf$nii_file[i]
-    
-    # Define the final target name (the uncompressed .nii)
-    # We strip the .gz if it exists to know what the final filename should be
-    clean_basename <- gsub("\\.gz$", "", basename(original_path))
-    scratch_filename <- paste0("row_", i, "_", clean_basename)
-    local_path_nii <- file.path(dir_scratch, scratch_filename)
-    
-    # CHECK: Does the uncompressed file already exist from a previous run?
-    if (file.exists(local_path_nii)) {
-      if (verbose && i == 1) message("Found existing files in scratch, skipping transfer...")
-      pf$nii_file[i] <- local_path_nii
-    } else {
-      # If not, we need to bring it over
-      local_path_raw <- file.path(dir_scratch, paste0("row_", i, "_", basename(original_path)))
-      file.copy(original_path, local_path_raw, overwrite = TRUE)
-      
-      # Decompress if it's a .gz
-      if (grepl("\\.gz$", local_path_raw)) {
-        pf$nii_file[i] <- R.utils::gunzip(local_path_raw, remove = TRUE, overwrite = TRUE)
-      } else {
-        pf$nii_file[i] <- local_path_raw
-      }
-    }
-    
+  # Transfer & Decompress Participant Files ------------------------------------
+  if (verbose) message(sprintf("Preparing %d files in scratch directory...", nrow(pf)))
+  # We use prepNII to handle the heavy lifting (check existence, copy, gunzip)
+  # but we use 'row_i' as the tag to ensure unique filenames in scratch.
+  pf$nii_file <- sapply(1:nrow(pf), function(i) {
+    # Call our standardized helper
+    local_path <- prepNII(path = pf$nii_file[i],
+                          tag = paste0("row_", i),
+                          dir_scratch = dir_scratch)
     if (verbose && i %% 10 == 0) {
       message(sprintf("Prepared %d of %d files...", i, nrow(pf)))
     }
+    return(local_path)
+  })
+  # Safety check for failed transfers
+  if (any(is.na(pf$nii_file))) {
+    stop("One or more participant NIfTI files could not be prepared in scratch.")
   }
+
+  # for (i in 1:nrow(pf)) {
+  #   original_path <- pf$nii_file[i]
+  #
+  #   # Define the final target name (the uncompressed .nii)
+  #   # We strip the .gz if it exists to know what the final filename should be
+  #   clean_basename <- gsub("\\.gz$", "", basename(original_path))
+  #   scratch_filename <- paste0("row_", i, "_", clean_basename)
+  #   local_path_nii <- file.path(dir_scratch, scratch_filename)
+  #
+  #   # CHECK: Does the uncompressed file already exist from a previous run?
+  #   if (file.exists(local_path_nii)) {
+  #     if (verbose && i == 1) message("Found existing files in scratch, skipping transfer...")
+  #     pf$nii_file[i] <- local_path_nii
+  #   } else {
+  #     # If not, we need to bring it over
+  #     local_path_raw <- file.path(dir_scratch, paste0("row_", i, "_", basename(original_path)))
+  #     file.copy(original_path, local_path_raw, overwrite = TRUE)
+  #
+  #     # Decompress if it's a .gz
+  #     if (grepl("\\.gz$", local_path_raw)) {
+  #       pf$nii_file[i] <- R.utils::gunzip(local_path_raw, remove = TRUE, overwrite = TRUE)
+  #     } else {
+  #       pf$nii_file[i] <- local_path_raw
+  #     }
+  #   }
+  #
+  #   if (verbose && i %% 10 == 0) {
+  #     message(sprintf("Prepared %d of %d files...", i, nrow(pf)))
+  #   }
+  # }
 
   # load or generate mask -----------------------------------------------------
   if (!missing(roi_nii) && !is.null(roi_nii)) {
     if (verbose) message("Copying ROI mask to scratch")
     # Copy original file exactly as is to scratch
     local_roi <- file.path(dir_scratch, basename(roi_nii))
-    file.copy(roi_nii, local_roi, overwrite = TRUE)    
+    file.copy(roi_nii, local_roi, overwrite = TRUE)
     # If it's zipped, decompress it locally on scratch
     if (grepl("\\.gz$", local_roi)) {
       roi_nii <- gunzip(local_roi, remove = TRUE, overwrite = TRUE)
@@ -203,7 +221,7 @@ modelVoxel <- function(nii_data,
     if (verbose) message(sprintf("Loading ROI mask: %s", basename(roi_nii)))
     mask <- read.nii.volume(roi_nii,1)
     mask <- (mask != 0) * 1
-    # gather image info 
+    # gather image info
     img_dims <- info.nii(roi_nii, "dims")
     pixdim <- info.nii(roi_nii, "pixdim")
     orient <- info.nii(roi_nii, "orient")
@@ -241,22 +259,22 @@ modelVoxel <- function(nii_data,
   if (rand_order) {
     if (verbose) { message("Randomizing voxel order") }
     vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
-  }  
+  }
 
   # Check that voxels are valid --------------------------------------------------
   if (verbose) { message("Checking for invalid voxels") }
-  valid_rows <- (vxl_ls[, 1] <= img_dims[1]) & 
-                (vxl_ls[, 2] <= img_dims[2]) & 
+  valid_rows <- (vxl_ls[, 1] <= img_dims[1]) &
+                (vxl_ls[, 2] <= img_dims[2]) &
                 (vxl_ls[, 3] <= img_dims[3])
   valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
   n_dropped <- sum(!valid_rows)
   if (n_dropped > 0) {
-    warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).", 
+    warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).",
                     n_dropped, img_dims[1], img_dims[2], img_dims[3]))
     vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
   }
   n.vxls <- nrow(vxl_ls)
-  
+
   # specify model function -------------------------------------------------------
   ## -load voxelwise data
   ## -run user code (model_fcn)
@@ -287,7 +305,7 @@ modelVoxel <- function(nii_data,
         print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start[i], chunk_stop[i]))
       }
     }
-    
+
     registerDoParallel(num_cores)
     foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
       worker_start <- Sys.time()
@@ -341,19 +359,19 @@ modelVoxel <- function(nii_data,
   # Transfer Results from Scratch to Save ----------------------------------
   # Identify the results (everything in scratch except the temporary unzipped participant files)
   # -nifti.io will create files starting with the modelResult
-  # -Compress in scratch first (faster local I/O). 
+  # -Compress in scratch first (faster local I/O).
   if (verbose) { message("Moving results and log files to final directory...") }
   result_files <- list.files(dir_scratch, pattern="modelResult", full.names=TRUE)
   for (f in result_files) {
     gz_file <- gzip(f, remove = TRUE, overwrite = TRUE)
     file.copy(gz_file, file.path(output_dir, basename(gz_file)), overwrite = TRUE)
-  }    
+  }
   gzip(file.path(dir_scratch, "log.nii"), remove = TRUE, overwrite = TRUE)
   file.copy(file.path(dir_scratch, "log.nii.gz"), output_dir, overwrite=TRUE)
   if (file.exists(file.path(dir_scratch, "failed_voxels.log"))) {
     file.copy(file.path(dir_scratch, "failed_voxels.log"), output_dir, overwrite=TRUE)
   }
-  
+
   # Cleanup ----------------------------------------------------------------
   ## This removes the scratch folder and all unzipped participant copies
   if (cleanup) {

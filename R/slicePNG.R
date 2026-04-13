@@ -211,8 +211,9 @@ slicePNG <- function(nii_data, nii_vol = 1,
     ## Add slice Location (World mm)
     if (draw_coords) {
       hdr_field <- switch(curr_plane, "sagittal"="srow_x", "coronal"="srow_y", "axial"="srow_z")
-      tform <- unlist(nifti.io::info.nii(local_nii, hdr_field))
-      world_mm <- round((curr_slice - 1) * tform[1] + tform[4], 1)
+      step_idx <- switch(curr_plane, "sagittal"=1, "coronal"=2, "axial"=3)
+      tf <- unlist(nifti.io::info.nii(local_nii, hdr_field))
+      world_mm <- round((curr_slice - 1) * tf[step_idx] + tf[4], 1)
       img <- magick::image_annotate(img, sprintf("%g mm", world_mm),
         gravity = "northwest", location = sprintf("+%d+%d", padding, padding),
         color = "white", size = base_font)
