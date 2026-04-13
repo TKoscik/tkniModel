@@ -4,9 +4,11 @@ export(modelCluster)
 export(cluster3D)
 
 # Visualization Utilities
-export(drawOverlay)
-export(drawEffect)
-export(slicesToRaster)
+export(slicePNG)
+export(overlayPNG)
+export(drawMontage)
+export(prepNII)
+export(autoSlice)
 
 # Core Imports
 import(doParallel)
@@ -16,3 +18,8 @@ import(R.utils)
 import(ggplot2)
 import(gridExtra)
 importFrom(raster, rasterFromXYZ, rasterToPolygons)
+importFrom(grDevices, colorRampPalette)
+importFrom(graphics, symbols, dev.off)
+importFrom(stats, quantile)
+importFrom(tools, file_path_sans_ext)
+
