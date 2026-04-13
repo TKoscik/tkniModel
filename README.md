@@ -20,7 +20,6 @@ A specialized toolkit for neuroimaging analysis on local and HPC environments.
 
 ## Installation
 ```r
-detach("package:tkniModel", unload=T)
 devtools::install_github("TKoscik/tkniModel")
 ```
 
