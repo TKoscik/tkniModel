@@ -2,11 +2,14 @@
 export(modelVoxel)
 export(modelCluster)
 export(cluster3D)
+export(getNIIData)
 
 # Exported Functions - Visualization
 export(slicePNG)
 export(overlayPNG)
 export(drawMontage)
+
+# Exported Functions - Helper
 export(prepNII)
 export(autoSlice)
 
