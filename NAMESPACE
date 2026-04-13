@@ -1,25 +1,29 @@
-# Main Processing and Clustering
+# Exported Functions - Modeling
 export(modelVoxel)
 export(modelCluster)
 export(cluster3D)
 
-# Visualization Utilities
+# Exported Functions - Visualization
 export(slicePNG)
 export(overlayPNG)
 export(drawMontage)
 export(prepNII)
 export(autoSlice)
 
-# Core Imports
+# Core Package Imports
 import(doParallel)
 import(foreach)
 import(nifti.io)
 import(R.utils)
+import(magick)
+import(parallel)
 import(ggplot2)
 import(gridExtra)
-importFrom(raster, rasterFromXYZ, rasterToPolygons)
+
+# Specific Function Imports
 importFrom(grDevices, colorRampPalette)
 importFrom(graphics, symbols, dev.off)
-importFrom(stats, quantile)
+importFrom(stats, quantile, na.omit)
 importFrom(tools, file_path_sans_ext)
+importFrom(methods, as)
 
