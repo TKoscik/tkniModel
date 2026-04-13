@@ -21,7 +21,6 @@ The package is designed to be used in four integrated phases:
 *   **`modelCluster()`**: A comprehensive thresholding pipeline. It identifies significant clusters, applies extent and peak-significance filters, and generates renumbered NIfTI masks and summary reports.
 *   **`getNIIData()`**: An optimized extraction tool that pulls participant values from labeled clusters or specific coordinates. Uses in-memory masking to maximize speed during post-hoc analysis.
 *   **`cluster3D()`**: A memory-efficient 3D seed-fill algorithm for identifying connected components using 6, 18, or 26-neighbor connectivity.
-*   **`clusterTable()`**: Extracts peak intensities, world coordinates (mm), and center-of-gravity statistics for significant clusters.
 
 ### Visualization
 *   **`drawMontage()`**: The master conductor for publication figures. Automatically parses layout strings (e.g., `5:x;5:y;5:z`) and arranges multi-layered composites into publication-ready grids.
