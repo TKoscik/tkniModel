@@ -43,22 +43,10 @@ modelCluster <- function(nii_estimate,
   }
 
   # 4. Copy and Decompress files to scratch -----------------------------------
-  # Helper to handle transfer and decompression
-  prep_nii <- function(orig_path, target_name, scratch_path) {
-    if (is.null(orig_path)) return(NULL)
-    dest <- file.path(scratch_path, paste0(target_name, ".nii"))
-    if (tools::file_ext(orig_path) == "gz") {
-      R.utils::gunzip(filename = orig_path, destname = dest, remove = FALSE, overwrite = TRUE)
-    } else {
-      file.copy(from = orig_path, to = dest, overwrite = TRUE)
-    }
-    return(dest)
-  }
-
-  nii_estimate <- prep_nii(nii_estimate, "estimate", dir_scratch)
-  nii_test     <- prep_nii(nii_test,     "test",     dir_scratch)
-  nii_pval     <- prep_nii(nii_pval,     "pval",     dir_scratch)
-  nii_mask     <- prep_nii(nii_mask,     "mask",     dir_scratch)
+  nii_estimate <- prepNii(nii_estimate, "estimate", dir_scratch)
+  nii_test     <- prepNii(nii_test,     "test",     dir_scratch)
+  nii_pval     <- prepNii(nii_pval,     "pval",     dir_scratch)
+  nii_mask     <- prepNii(nii_mask,     "mask",     dir_scratch)
 
   # 5. Load Image Metadata ----------------------------------------------------
   # Using nii_estimate as the reference for headers
