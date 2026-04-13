@@ -1,13 +1,13 @@
 Package: tkniModel
 Type: Package
-Title: Parallel Voxel-wise Modeling for Neuroimaging
-Version: 0.1.0
+Title: Parallel Voxel-wise Modeling and Advanced Visualization for Neuroimaging
+Version: 0.2.0
 Author: Timothy R. Koscik <tkoscik@uams.edu>
 Maintainer: Timothy R. Koscik <tkoscik@uams.edu>
 Description: A specialized toolkit for neuroimaging analysis on local and HPC 
     environments. Features include BIDS-compliant file matching, automated 
     scratch I/O management, voxel-wise modeling, cluster thresholding, 
-    and advanced ggplot2-based brain overlays.
+    and high-performance magick-based brain overlays and montages.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -17,12 +17,10 @@ Imports:
     nifti.io,
     R.utils,
     parallel,
-    ggplot2,
-    gridExtra,
-    raster,
-    sp,
+    magick,
     tools,
     grDevices,
+    graphics,
     methods,
     stats,
     lmerTest,
