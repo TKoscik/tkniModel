@@ -24,8 +24,8 @@ import(ggplot2)
 import(gridExtra)
 
 # Specific Function Imports
-importFrom(grDevices, colorRampPalette)
-importFrom(graphics, symbols, dev.off)
+importFrom(grDevices, colorRampPalette, dev.off)
+importFrom(graphics, symbols)
 importFrom(stats, quantile, na.omit)
 importFrom(tools, file_path_sans_ext)
 importFrom(methods, as)
