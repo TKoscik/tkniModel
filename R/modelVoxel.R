@@ -274,8 +274,8 @@ modelVoxel <- function(nii_data,
         print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start[i], chunk_stop[i]))
       }
     }
-    cl <- makeCluster(num_cores, type="PSOCK")
-    registerDoParallel(cl)
+    #cl <- makeCluster(num_cores, type="PSOCK")
+    registerDoParallel(num_cores)
     foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
       worker_start <- Sys.time()
       vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
@@ -289,11 +289,11 @@ modelVoxel <- function(nii_data,
           df$nii <- numeric(nrow(df))
           modelResult <- model.fxn(coords, df)
           ## add short delay periodically to reduce the likelihood of I/O collisions
-          #Sys.sleep(runif(1, 0, 0.01))
+          Sys.sleep(runif(1, 0, 0.01))
           table.to.nii(in.table=modelResult, coords=coords, save.dir=dir_scratch,
                        do.log=TRUE, model.string=model_pfx,
                        img.dims=img_dims, pixdim=pixdim, orient=orient)
-          #Sys.sleep(runif(1, 0, 0.01))
+          Sys.sleep(runif(1, 0, 0.01))
           write.nii.voxel(log.nii, coords, 2)
         }, error = function(e) {
           error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
