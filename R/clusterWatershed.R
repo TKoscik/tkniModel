@@ -155,7 +155,7 @@ clusterWatershed <- function(nii_pval,
       nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_mask.nii")), dims=dims, pixdim=pixdim, orient=orient)
       nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_mask.nii")), 1, (final_map > 0)*1)
     }
-    
+    print(pfx)
     if (save_clusters && any(final_map > 0)) {
       nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_cluster.nii")), dims=dims, pixdim=pixdim, orient=orient)
       nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_cluster.nii")), 1, final_map)
