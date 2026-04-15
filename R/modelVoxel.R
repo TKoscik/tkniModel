@@ -322,7 +322,7 @@ modelVoxel <- function(nii_data,
         }
       }
       registerDoParallel(num_cores)
-      getDoParWorkers()
+      print(getDoParWorkers())
       foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
         worker_start <- Sys.time()
         vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
