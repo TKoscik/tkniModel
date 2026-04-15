@@ -57,7 +57,11 @@ clusterWatershed <- function(nii_pval,
       message(sprintf("No significant %s peaks found. Skipping.", curr_dir))
       next
     }
-
+    
+    # Construct the naming prefix for all outputs in this direction
+    pfx <- sprintf("effect-%s_dir-%s_p%g_cl%d", 
+                   effect_name, curr_dir, peak_thresh, cluster_size)
+    
     # Height map (-log10 p) for the "landscape"
     height_vals <- pval_vol
     height_vals[height_vals == 0] <- min(height_vals[height_vals > 0], na.rm = TRUE)
