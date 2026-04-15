@@ -1,4 +1,4 @@
-modelCluster <- function(nii_estimate,
+clusterModel <- function(nii_estimate,
                          nii_test,
                          nii_pval,
                          nii_mask        = NULL,
