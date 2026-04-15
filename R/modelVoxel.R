@@ -205,44 +205,44 @@ modelVoxel <- function(nii_data,
   vxl_ls <- which(mask!=0, arr.ind=TRUE)
   
   # initialize log file if it doesn't exist --------------------------------------
-  if (verbose) { message("Checking log file") }
-  log.nii <- paste0(dir_scratch, "/log.nii")
-  if (file.exists(log.nii) == FALSE || restart_log == TRUE) {
-    if (verbose) { message("Continuing prior run") }
-    init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
-    write.nii.volume(log.nii, vol.num=1, value=mask)
-  } else {
-    if (verbose) { message("No log found, initializing...") }
-    log <- read.nii.volume(log.nii,1)
-    vxls_not_run <- (log == 1) * 1
-    vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
-  }
+  #if (verbose) { message("Checking log file") }
+  #log.nii <- paste0(dir_scratch, "/log.nii")
+  #if (file.exists(log.nii) == FALSE || restart_log == TRUE) {
+  #  if (verbose) { message("Continuing prior run") }
+  #  init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
+  #  write.nii.volume(log.nii, vol.num=1, value=mask)
+  #} else {
+  #  if (verbose) { message("No log found, initializing...") }
+  #  log <- read.nii.volume(log.nii,1)
+  #  vxls_not_run <- (log == 1) * 1
+  #  vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
+  #}
   
   # set voxel looping parameters ------------------------------------------------
-  n.vxls <- nrow(vxl_ls)
+  #n.vxls <- nrow(vxl_ls)
   ## check if there are no voxels
-  if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
-  if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
+  #if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
+  #if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
   
   ## randomize order ---
-  if (rand_order) {
-    if (verbose) { message("Randomizing voxel order") }
-    vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
-  }
+  #if (rand_order) {
+  #  if (verbose) { message("Randomizing voxel order") }
+  #  vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
+  #}
   
   # Check that voxels are valid --------------------------------------------------
-  if (verbose) { message("Checking for invalid voxels") }
-  valid_rows <- (vxl_ls[, 1] <= img_dims[1]) &
-    (vxl_ls[, 2] <= img_dims[2]) &
-    (vxl_ls[, 3] <= img_dims[3])
-  valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
-  n_dropped <- sum(!valid_rows)
-  if (n_dropped > 0) {
-    warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).",
-                    n_dropped, img_dims[1], img_dims[2], img_dims[3]))
-    vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
-  }
-  n.vxls <- nrow(vxl_ls)
+  #if (verbose) { message("Checking for invalid voxels") }
+  #valid_rows <- (vxl_ls[, 1] <= img_dims[1]) &
+  #  (vxl_ls[, 2] <= img_dims[2]) &
+  #  (vxl_ls[, 3] <= img_dims[3])
+  #valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
+  #n_dropped <- sum(!valid_rows)
+  #if (n_dropped > 0) {
+  #  warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).",
+  #                  n_dropped, img_dims[1], img_dims[2], img_dims[3]))
+  #  vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
+  #}
+  #n.vxls <- nrow(vxl_ls)
   
   # specify model function -------------------------------------------------------
   ## -load voxelwise data
@@ -322,6 +322,7 @@ modelVoxel <- function(nii_data,
         }
       }
       registerDoParallel(num_cores)
+      getDoParWorkers()
       foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
         worker_start <- Sys.time()
         vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
