@@ -50,58 +50,46 @@ clusterWatershed <- function(nii_pval,
     pfx <- sprintf("effect-%s_dir-%s_watershed_p-%0.0g_peak-%0.0g_cl-%d", 
       effect_name, curr_dir, extent_thresh, peak_thresh, cluster_size)
     
-    # 2. Define Directional Bounding -------------------------------------------
-    dir_mask <- if(curr_dir == "pos") (est_vol > 0) else (est_vol < 0)
-    valid_extent <- (pval_vol <= extent_thresh & mask_vol_data > 0 & dir_mask)
-    valid_extent[is.na(valid_extent)] <- FALSE # Force NAs to FALSE
-    valid_peak   <- (pval_vol <= peak_thresh & mask_vol_data > 0 & dir_mask)
-    valid_peak[is.na(valid_peak)] <- FALSE # Force NAs to FALSE
+    # 1. Direction-Specific Data Masking
+    local_pval <- pval_vol
+    if (curr_dir == "pos") {
+      local_pval[est_vol <= 0] <- 1  # Hide negative effects
+    } else {
+      local_pval[est_vol >= 0] <- 1  # Hide positive effects
+    }
+
+    # 2. Re-calculate Bounding with the "Cleaned" p-values
+    valid_extent <- (local_pval <= extent_thresh & mask_vol_data > 0)
+    valid_extent[is.na(valid_extent)] <- FALSE    
+    valid_peak   <- (local_pval <= peak_thresh & mask_vol_data > 0)
+    valid_peak[is.na(valid_peak)] <- FALSE    
+    if (sum(valid_peak) == 0) next
+
+    # 3. Heights based ONLY on the correct direction
+    local_pval[local_pval == 0] <- 1e-10 
+    heights <- -log10(local_pval) * valid_extent
+
+    # 4. Summit Identification
     peak_seeds_map <- cluster3D(valid_peak, connectivity = connectivity)
     
-    if (max(peak_seeds_map) == 0) {
-      message(sprintf("No significant %s summits found. Skipping.", curr_dir))
-      next
-    }
-    
-    # Height map (-log10 p) for the "landscape"
-    height_vals <- pval_vol
-    height_vals[height_vals == 0] <- min(height_vals[height_vals > 0], na.rm = TRUE)
-    heights <- -log10(height_vals) * valid_extent
-
-    # 3. Seed Growth (Flooding) -----------------------------------------------
-    # watershed_map starts with the "summits" already labeled
+    # 5. Flooding (Strictly restricted to valid_extent)
     watershed_map <- peak_seeds_map
-    n_summits <- max(peak_seeds_map)
-    
-    # Identify all voxels that need to be "flooded" 
-    # (Voxels that meet extent_thresh but aren't in a summit yet)
     to_flood_mask <- (valid_extent & watershed_map == 0)
-    flood_indices <- which(to_flood_mask)
-    
-    # Sort these voxels by significance (highest p-value first)
-    # This ensures "valleys" flow into the most significant adjacent summit
-    ordered_vox <- flood_indices[order(heights[flood_indices], decreasing = TRUE)]
-    
-    # Neighborhood offsets for growth
-    offsets <- if(connectivity == 26) as.matrix(expand.grid(-1:1, -1:1, -1:1))[-14, ] else
-               matrix(c(1,0,0, -1,0,0, 0,1,0, 0,-1,0, 0,0,1, 0,0,-1), ncol=3, byrow=TRUE)
+    ordered_vox <- which(to_flood_mask)[order(heights[to_flood_mask], decreasing = TRUE)]
 
     for (v in ordered_vox) {
       v_coord <- arrayInd(v, dims)
       neighbors_coords <- sweep(offsets, 2, v_coord, "+")
-      
-      # Bounds check
       valid_n <- rowSums(neighbors_coords > 0 & sweep(neighbors_coords, 2, dims, "<=")) == 3
       neighbors_lin <- (neighbors_coords[valid_n, 3] - 1) * dims[1] * dims[2] + 
-                 (neighbors_coords[valid_n, 2] - 1) * dims[1] + 
-                  neighbors_coords[valid_n, 1]
+                       (neighbors_coords[valid_n, 2] - 1) * dims[1] + 
+                        neighbors_coords[valid_n, 1]
       
-      # Check if this voxel touches an already labeled basin/summit
-      nearby_labels <- unique(watershed_map[neighbors_lin])
+      # IMPORTANT: Only flow into labels that are also part of valid_extent
+      nearby_labels <- unique(waters_map[neighbors_lin])
       nearby_labels <- nearby_labels[nearby_labels > 0]
       
       if (length(nearby_labels) > 0) {
-        # Flow into the most significant neighbor already labeled
         watershed_map[v] <- nearby_labels[1]
       }
     }
