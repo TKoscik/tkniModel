@@ -99,7 +99,7 @@ clusterWatershed <- function(nii_pval,
                         neighbors_coords[valid_n, 1]
       
       # IMPORTANT: Only flow into labels that are also part of valid_extent
-      nearby_labels <- unique(waters_map[neighbors_lin])
+      nearby_labels <- unique(watershed_map[neighbors_lin])
       nearby_labels <- nearby_labels[nearby_labels > 0]
       
       if (length(nearby_labels) > 0) {
