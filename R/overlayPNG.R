@@ -126,14 +126,16 @@ overlayPNG <- function(bg_nii,
     img_stack <- magick::image_read(bg_paths[s_idx])
     img_stack <- magick::image_convert(img_stack, type = "truecoloralpha")
     # B. Add Foreground Layers
-    for (l_idx in seq_along(fg_results)) {
-      fg_path <- fg_results[[l_idx]][s_idx]
-      mask_path <- gsub("\\.png$", "_mask.png", fg_path)
-      fg_img <- magick::image_read(fg_path)
-      fg_mask <- magick::image_read(mask_path)
-      # Apply spatial mask and composite
-      fg_trans <- magick::image_composite(fg_img, fg_mask, operator = "CopyOpacity")
-      img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
+    if (n_fg > 0) {
+      for (l_idx in seq_along(fg_results)) {
+        fg_path <- fg_results[[l_idx]][s_idx]
+        mask_path <- gsub("\\.png$", "_mask.png", fg_path)
+        fg_img <- magick::image_read(fg_path)
+        fg_mask <- magick::image_read(mask_path)
+        # Apply spatial mask and composite
+        fg_trans <- magick::image_composite(fg_img, fg_mask, operator = "CopyOpacity")
+        img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
+      }
     }
 
     # C. Add ROI Layers --------------------------------------------------------
