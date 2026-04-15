@@ -125,6 +125,7 @@ overlayPNG <- function(bg_nii,
     # A. Base Anatomy
     img_stack <- magick::image_read(bg_paths[s_idx])
     img_stack <- magick::image_convert(img_stack, type = "truecoloralpha")
+    info <- magick::image_info(img_stack) 
     # B. Add Foreground Layers
     if (n_fg > 0) {
       for (l_idx in seq_along(fg_results)) {
@@ -204,7 +205,8 @@ overlayPNG <- function(bg_nii,
               roi_hex[roi_mx] <- target_col            
               # Render and composite
               roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
-              roi_img <- magick::image_resize(roi_img, geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
+              roi_img <- magick::image_resize(roi_img,
+                geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
               img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
             }
           }
