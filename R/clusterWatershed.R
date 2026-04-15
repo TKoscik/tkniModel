@@ -59,8 +59,8 @@ clusterWatershed <- function(nii_pval,
     }
     
     # Construct the naming prefix for all outputs in this direction
-    pfx <- sprintf("effect-%s_dir-%s_p%g_cl%d", 
-                   effect_name, curr_dir, peak_thresh, cluster_size)
+    pfx <- sprintf("effect-%s_dir-%s_watershed_p-%0.0g_peak-%0.0g_cl-%d", 
+      effect_name, curr_dir, extent_thresh, peak_thresh, cluster_size)
     
     # Height map (-log10 p) for the "landscape"
     height_vals <- pval_vol
@@ -149,7 +149,7 @@ clusterWatershed <- function(nii_pval,
     
     # 6. Saving Results with Effect-Specific Naming ---------------------------
     # Use effect_name in prefix for organized output
-    pfx <- sprintf("effect-%s_dir-%s_p%g_cl%d", effect_name, curr_dir, peak_thresh, cluster_size)
+    #pfx <- sprintf("effect-%s_dir-%s_p%g_cl%d", effect_name, curr_dir, peak_thresh, cluster_size)
     
     if (save_mask && any(final_map > 0)) {
       nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_mask.nii")), dims=dims, pixdim=pixdim, orient=orient)
@@ -157,8 +157,8 @@ clusterWatershed <- function(nii_pval,
     }
     
     if (save_clusters && any(final_map > 0)) {
-      nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_clusters.nii")), dims=dims, pixdim=pixdim, orient=orient)
-      nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_clusters.nii")), 1, final_map)
+      nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_cluster.nii")), dims=dims, pixdim=pixdim, orient=orient)
+      nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_cluster.nii")), 1, final_map)
     }
   }
 }
