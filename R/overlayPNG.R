@@ -18,6 +18,7 @@ overlayPNG <- function(bg_nii,
                        roi_vol_list = 1,
                        roi_value = "all",
                        roi_color = "hotpink",
+                       roi_outline = TRUE,
                        slice_x = NULL, slice_y = NULL, slice_z = NULL,
                        scale = 1,
                        draw_side = FALSE,
@@ -135,25 +136,63 @@ overlayPNG <- function(bg_nii,
       img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
     }
 
-    # C. Add ROI Outlines (if needed) & Label Templates
+    # C. Add ROI Layers --------------------------------------------------------
     if (!missing(roi_nii_list)) {
+      n_roi_files <- length(roi_vols)
+      # Normalize inputs to lists if they aren't already
+      if (!is.list(roi_value)) roi_value <- rep(list(roi_value), n_roi_files)
+      if (!is.list(roi_color)) roi_color <- rep(list(roi_color), n_roi_files)
+      if (!is.list(roi_outline)) roi_outline <- rep(list(roi_outline), n_roi_files)
+      # Ensure they match the number of files
+      roi_value   <- rep(roi_value,   length.out = n_roi_files)
+      roi_color   <- rep(roi_color,   length.out = n_roi_files)
+      roi_outline <- rep(roi_outline, length.out = n_roi_files)
+      
       for (r_idx in seq_along(roi_vols)) {
-        vol_data <- roi_vols[[r_idx]]
-        if (roi_value != "all") vol_data <- (vol_data == as.numeric(roi_value)) * 1
-        r_slice <- switch(curr_p,
-                          "coronal"  = vol_data[, curr_s, ],
-                          "axial"    = vol_data[, , curr_s],
-                          "sagittal" = vol_data[curr_s, , ])
-        interior <- (r_slice > 0) & (cbind(r_slice[,-1], 0) > 0) & (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
-          (rbind(r_slice[-1,], 0) > 0) & (rbind(0, r_slice[-nrow(r_slice),]) > 0)
-        outline_mx <- (r_slice > 0 & !interior)
-        if (sum(outline_mx) > 0) {
-          roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))
-          roi_hex[outline_mx] <- roi_color[r_idx]
-          roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
-          info <- magick::image_info(img_stack)
-          roi_img <- magick::image_resize(roi_img, geometry = magick::geometry_size_pixels(width = info$width, height = info$height, preserve_aspect = FALSE))
-          img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
+        vol_data <- roi_vols[[r_idx]]        
+        # Determine labels for THIS specific file
+        curr_vals <- roi_value[[r_idx]]
+        if (length(curr_vals) == 1 && curr_vals == "all") {
+          labels_to_plot <- sort(unique(as.vector(vol_data[vol_data > 0])))
+        } else {
+          labels_to_plot <- as.numeric(curr_vals)
+        }
+        # Determine colors for THIS specific file
+        curr_colors <- roi_color[[r_idx]]
+        curr_outline <- roi_outline[[r_idx]]
+
+        for (l_idx in seq_along(labels_to_plot)) {
+          curr_lab <- labels_to_plot[l_idx]          
+          # Mask out only the current label
+          lab_mask <- (vol_data == curr_lab) * 1
+          r_slice <- switch(curr_p, 
+                            "coronal"  = lab_mask[, curr_s, ],
+                            "axial"    = lab_mask[, , curr_s],
+                            "sagittal" = lab_mask[curr_s, , ])
+          if (sum(r_slice) == 0) next          
+          # Determine the pixels to color (Outline vs Solid)
+          if (curr_outline) {
+            interior <- (r_slice > 0) &
+                        (cbind(r_slice[,-1], 0) > 0) &
+                        (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
+                        (rbind(r_slice[-1,], 0) > 0) &
+                        (rbind(0, r_slice[-nrow(r_slice),]) > 0)
+            roi_mx <- (r_slice > 0 & !interior)
+          } else {
+            roi_mx <- (r_slice > 0)
+          }
+          
+          if (sum(roi_mx) > 0) {
+            roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
+            # Map color: Use the label index (l_idx) to pick from the current file's palette
+            # If the palette is shorter than the labels, it cycles back to the first color
+            target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
+            roi_hex[roi_mx] <- target_col            
+            # ... [Magick read/rotate/flop/resize logic remains same] ...
+            roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
+            roi_img <- magick::image_resize(roi_img, geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
+            img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
+          }
         }
       }
     }
