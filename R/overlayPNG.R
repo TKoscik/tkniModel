@@ -212,7 +212,6 @@ overlayPNG <- function(bg_nii,
           }
         }
       }
-    }
 
     # D. Add labels if requested
     side_path <- file.path(dir_scratch, sprintf("label_%s_side.png", curr_p))
