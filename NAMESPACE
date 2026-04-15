@@ -1,6 +1,7 @@
 # Exported Functions - Modeling
 export(modelVoxel)
 export(clusterModel)
+export(clusterWatershed)
 export(cluster3D)
 export(getNIIData)
 
