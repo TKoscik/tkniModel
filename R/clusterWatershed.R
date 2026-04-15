@@ -92,9 +92,9 @@ clusterWatershed <- function(nii_pval,
       
       # Bounds check
       valid_n <- rowSums(neighbors_coords > 0 & sweep(neighbors_coords, 2, dims, "<=")) == 3
-      neighbors_lin <- (neighbors_coords[valid_n,3]-1)*dims*dims + 
-                       (neighbors_coords[valid_n,2]-1)*dims + 
-                        neighbors_coords[valid_n,1]
+      neighbors_lin <- (neighbors_coords[valid_n, 3] - 1) * dims[1] * dims[2] + 
+                 (neighbors_coords[valid_n, 2] - 1) * dims[1] + 
+                  neighbors_coords[valid_n, 1]
       
       # Check if this voxel touches an already labeled basin/summit
       nearby_labels <- unique(watershed_map[neighbors_lin])
@@ -161,17 +161,18 @@ clusterWatershed <- function(nii_pval,
     }
     
     # 6. Saving Results with Effect-Specific Naming ---------------------------
-    # Use effect_name in prefix for organized output
-    #pfx <- sprintf("effect-%s_dir-%s_p%g_cl%d", effect_name, curr_dir, peak_thresh, cluster_size)
-    
     if (save_mask && any(final_map > 0)) {
-      nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_mask.nii")), dims=dims, pixdim=pixdim, orient=orient)
-      nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_mask.nii")), 1, (final_map > 0)*1)
+      mask_path <- file.path(dir_save, paste0(pfx, "_mask.nii"))
+      nifti.io::init.nii(mask_path, dims=dims, pixdim=pixdim, orient=orient)
+      nifti.io::write.nii.volume(mask_path, 1, (final_map > 0)*1)
+      R.utils::gzip(mask_path, overwrite = TRUE, remove = TRUE)
     }
+    
     if (save_clusters && any(final_map > 0)) {
-      print(pfx)
-      nifti.io::init.nii(file.path(dir_save, paste0(pfx, "_cluster.nii")), dims=dims, pixdim=pixdim, orient=orient)
-      nifti.io::write.nii.volume(file.path(dir_save, paste0(pfx, "_cluster.nii")), 1, final_map)
+      cl_path <- file.path(dir_save, paste0(pfx, "_cluster.nii"))
+      nifti.io::init.nii(cl_path, dims=dims, pixdim=pixdim, orient=orient)
+      nifti.io::write.nii.volume(cl_path, 1, final_map)
+      R.utils::gzip(cl_path, overwrite = TRUE, remove = TRUE)
     }
   }
 }
