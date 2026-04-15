@@ -218,7 +218,7 @@ modelVoxel <- function(nii_data,
     vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
   }
 
-  # set voxel looping poarameters ------------------------------------------------
+  # set voxel looping parameters ------------------------------------------------
   n.vxls <- nrow(vxl_ls)
   ## check if there are no voxels
   if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
@@ -255,6 +255,7 @@ modelVoxel <- function(nii_data,
     return(modelResult)
   }
 
+  # run parallel loop over all voxels ----------------------------------------------
   do_debug=FALSE
   if (!is.na(debug) && debug > 0) {
       do_debug=TRUE
@@ -265,6 +266,52 @@ modelVoxel <- function(nii_data,
     # Run voxels in parallel
     if (verbose) { message(sprintf("Starting voxelwise models on %d cores...", num_cores))}
     proc_start <- Sys.time()
+    
+    # Check Log for incomplete voxels ---------------------------------------------
+    # initialize log file if it doesn't exist
+    if (verbose) { message("Checking log file") }
+    log.nii <- paste0(dir_scratch, "/log.nii")
+    if (file.exists(log.nii) == FALSE) {
+      if (verbose) { message("No log found, initializing...") }
+      init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
+      write.nii.volume(log.nii, vol.num=1, value=mask)
+    } else if (restart_log == TRUE) {
+      if (verbose) { message("Reinitializing log and restarting analysis...") }
+      init.nii(log.nii, dims=img_dims, pixdim=pixdim, orient=orient, init.value=0)
+      write.nii.volume(log.nii, vol.num=1, value=mask)
+    } else {      
+      if (verbose) { message("Continuing prior run") }
+    }
+
+    # read log file to get voxel list
+    log <- read.nii.volume(log.nii,1)
+    vxls_not_run <- (log == 1) * 1
+    vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
+    n.vxls <- nrow(vxl_ls)
+    if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
+    if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
+    # Check that voxels are valid --------------------------------------------------
+    if (verbose) { message("Checking for invalid voxels") }
+    valid_rows <- (vxl_ls[, 1] <= img_dims[1]) &
+      (vxl_ls[, 2] <= img_dims[2]) &
+      (vxl_ls[, 3] <= img_dims[3])
+    valid_rows <- valid_rows & (vxl_ls[, 1] > 0) & (vxl_ls[, 2] > 0) & (vxl_ls[, 3] > 0)
+    n_dropped <- sum(!valid_rows)
+    if (n_dropped > 0) {
+      warning(sprintf("Dropped %d voxels that were outside image boundaries (%d, %d, %d).",
+                      n_dropped, img_dims[1], img_dims[2], img_dims[3]))
+      vxl_ls <- vxl_ls[valid_rows, , drop = FALSE]
+    }
+    n.vxls <- nrow(vxl_ls)
+    
+    # repeat loop until all voxels are run -------------------------------------
+    while (n.vxls > 0) {
+      ## randomize voxel order ---
+      if (rand_order) {
+        if (verbose) { message("Randomizing voxel order") }
+        vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
+      }
+    
     # Split indices into a list of chunks
     chunker <- round(seq(1, n.vxls, length.out=num_cores+1))
     chunk_start <- chunker[1:(length(chunker)-1)]
@@ -274,7 +321,6 @@ modelVoxel <- function(nii_data,
         print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start[i], chunk_stop[i]))
       }
     }
-    #cl <- makeCluster(num_cores, type="PSOCK")
     registerDoParallel(num_cores)
     foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
       worker_start <- Sys.time()
@@ -298,6 +344,7 @@ modelVoxel <- function(nii_data,
         }, error = function(e) {
           error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
           write(error_msg, file = file.path(dir_scratch, "failed_voxels.log"), append = TRUE)
+          write.nii.voxel(log.nii, coords, 3)
         })
         if (verbose) {
           pct <- floor((i / n_in_chunk) * 100)
@@ -312,11 +359,17 @@ modelVoxel <- function(nii_data,
       message(sprintf("[%s] COMPLETED. Total elapsed time: %s", worker_id, format(elapsed)))
     }
     stopImplicitCluster() # Stop parallelization
-    proc_stop <- Sys.time()
-    elapsed <- difftime(proc_stop, proc_start, units = "auto")
-    message(sprintf("MODELLING COMPLETED. Total elapsed time: %s", format(elapsed)))
+    # read log file to get voxel list
+    message("Checking log file to ensure completeness, will rerun missing voxels.")
+    log <- read.nii.volume(log.nii,1)
+    vxls_not_run <- (log == 1) * 1
+    vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
+    n.vxls <- nrow(vxl_ls)
   }
-
+  proc_stop <- Sys.time()
+  elapsed <- difftime(proc_stop, proc_start, units = "auto")
+  message(sprintf("MODELLING COMPLETED. Total elapsed time: %s", format(elapsed)))
+  
   # Create Final Output Directory ------------------------------------------
   # We use the user's model prefix to create a specific sub-folder
   if (verbose) { message("Creating output directory") }
