@@ -135,6 +135,8 @@ overlayPNG <- function(bg_nii,
         fg_mask <- magick::image_read(mask_path)
         # Apply spatial mask and composite
         fg_trans <- magick::image_composite(fg_img, fg_mask, operator = "CopyOpacity")
+        alpha_val <- fg_alphas[l_idx] * 100
+        fg_trans <- magick::image_channel(fg_trans, opacity = alpha_val)
         img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
       }
     }
