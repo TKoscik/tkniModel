@@ -322,7 +322,7 @@ modelVoxel <- function(nii_data,
         }
       }
       registerDoParallel(num_cores)
-      print(getDoParWorkers())
+      print(sprintf("%d Workers Running", getDoParWorkers()))
       foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
         worker_start <- Sys.time()
         vxl_chunk <- vxl_ls[chunk_start[chk_id]:chunk_stop[chk_id], ]
@@ -352,6 +352,7 @@ modelVoxel <- function(nii_data,
             prev_pct <- floor(((i - 1) / n_in_chunk) * 100)
             if (pct > prev_pct) {
               message(sprintf("[%s] progress: %d%% completed", worker_id, pct))
+              print(sprintf("%d Workers Running", getDoParWorkers()))
             }
           }
         }
