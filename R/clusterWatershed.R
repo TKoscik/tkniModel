@@ -46,51 +46,62 @@ clusterWatershed <- function(nii_pval,
   for (curr_dir in dirs_to_run) {
     message(sprintf("Processing %s watershed clusters for %s...", curr_dir, effect_name))
     
+    # Construct the naming prefix for all outputs in this direction
+    pfx <- sprintf("effect-%s_dir-%s_watershed_p-%0.0g_peak-%0.0g_cl-%d", 
+      effect_name, curr_dir, extent_thresh, peak_thresh, cluster_size)
+    
     # 2. Define Directional Bounding -------------------------------------------
     dir_mask <- if(curr_dir == "pos") (est_vol > 0) else (est_vol < 0)
     valid_extent <- (pval_vol <= extent_thresh & mask_vol_data > 0 & dir_mask)
     valid_extent[is.na(valid_extent)] <- FALSE # Force NAs to FALSE
     valid_peak   <- (pval_vol <= peak_thresh & mask_vol_data > 0 & dir_mask)
     valid_peak[is.na(valid_peak)] <- FALSE # Force NAs to FALSE
+    peak_seeds_map <- cluster3D(valid_peak, connectivity = connectivity)
     
-    if (sum(valid_peak, na.rm = TRUE) == 0) {
-      message(sprintf("No significant %s peaks found. Skipping.", curr_dir))
+    if (max(peak_seeds_map) == 0) {
+      message(sprintf("No significant %s summits found. Skipping.", curr_dir))
       next
     }
-    
-    # Construct the naming prefix for all outputs in this direction
-    pfx <- sprintf("effect-%s_dir-%s_watershed_p-%0.0g_peak-%0.0g_cl-%d", 
-      effect_name, curr_dir, extent_thresh, peak_thresh, cluster_size)
     
     # Height map (-log10 p) for the "landscape"
     height_vals <- pval_vol
     height_vals[height_vals == 0] <- min(height_vals[height_vals > 0], na.rm = TRUE)
     heights <- -log10(height_vals) * valid_extent
 
-    # 3. Seed Growth (Flooding Logic from PDF) ---------------------------------
-    peak_voxels <- which(valid_peak)
-    ordered_vox <- peak_voxels[order(heights[peak_voxels], decreasing = TRUE)]
+    # 3. Seed Growth (Flooding) -----------------------------------------------
+    # watershed_map starts with the "summits" already labeled
+    watershed_map <- peak_seeds_map
+    n_summits <- max(peak_seeds_map)
     
-    watershed_map <- array(0, dim = dims)
-    n_clusters <- 0
+    # Identify all voxels that need to be "flooded" 
+    # (Voxels that meet extent_thresh but aren't in a summit yet)
+    to_flood_mask <- (valid_extent & watershed_map == 0)
+    flood_indices <- which(to_flood_mask)
+    
+    # Sort these voxels by significance (highest p-value first)
+    # This ensures "valleys" flow into the most significant adjacent summit
+    ordered_vox <- flood_indices[order(heights[flood_indices], decreasing = TRUE)]
+    
+    # Neighborhood offsets for growth
     offsets <- if(connectivity == 26) as.matrix(expand.grid(-1:1, -1:1, -1:1))[-14, ] else
                matrix(c(1,0,0, -1,0,0, 0,1,0, 0,-1,0, 0,0,1, 0,0,-1), ncol=3, byrow=TRUE)
 
     for (v in ordered_vox) {
       v_coord <- arrayInd(v, dims)
       neighbors_coords <- sweep(offsets, 2, v_coord, "+")
-      valid_neigh <- rowSums(neighbors_coords > 0 & sweep(neighbors_coords, 2, dims, "<=")) == 3
-      neighbors_lin <- (neighbors_coords[valid_neigh,3]-1)*dims[1]*dims[2] + 
-                       (neighbors_coords[valid_neigh,2]-1)*dims[1] + 
-                        neighbors_coords[valid_neigh,1]
       
+      # Bounds check
+      valid_n <- rowSums(neighbors_coords > 0 & sweep(neighbors_coords, 2, dims, "<=")) == 3
+      neighbors_lin <- (neighbors_coords[valid_n,3]-1)*dims*dims + 
+                       (neighbors_coords[valid_n,2]-1)*dims + 
+                        neighbors_coords[valid_n,1]
+      
+      # Check if this voxel touches an already labeled basin/summit
       nearby_labels <- unique(watershed_map[neighbors_lin])
       nearby_labels <- nearby_labels[nearby_labels > 0]
       
-      if (length(nearby_labels) == 0) {
-        n_clusters <- n_clusters + 1
-        watershed_map[v] <- n_clusters
-      } else {
+      if (length(nearby_labels) > 0) {
+        # Flow into the most significant neighbor already labeled
         watershed_map[v] <- nearby_labels[1]
       }
     }
@@ -98,12 +109,14 @@ clusterWatershed <- function(nii_pval,
     # 4. Filter by Cluster Size -----------------------------------------------
     cluster_counts <- as.data.frame(table(raw_clusters = watershed_map[watershed_map > 0]))
     valid_ids <- as.numeric(as.character(cluster_counts$raw_clusters[cluster_counts$Freq >= cluster_size]))
-    
+
     final_map <- array(0, dim = dims)
     if (length(valid_ids) > 0) {
       for (i in seq_along(valid_ids)) {
         final_map[watershed_map == valid_ids[i]] <- i
       }
+    } else {
+      message(sprintf("No %s clusters met the size threshold.", curr_dir))
     }
 
     # 5. Table Generation (Peak Identification) -------------------------------
