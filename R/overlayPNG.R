@@ -133,10 +133,14 @@ overlayPNG <- function(bg_nii,
         mask_path <- gsub("\\.png$", "_mask.png", fg_path)
         fg_img <- magick::image_read(fg_path)
         fg_mask <- magick::image_read(mask_path)
-        # Apply spatial mask and composite
+        # 1. Spatial Masking
         fg_trans <- magick::image_composite(fg_img, fg_mask, operator = "CopyOpacity")
-        alpha_val <- fg_alphas[l_idx] * 100
-        fg_trans <- magick::image_colorize(fg_trans, opacity = alpha_val, color = "white")
+        # 2. Global Opacity Adjustment
+        # This scales the existing alpha channel by your fg_alphas value (0.0 to 1.0)
+        # It ensures the 'holes' stay transparent while the 'solid' bits become see-through
+        fg_trans <- magick::image_evaluate(fg_trans, operator = "Multiply", 
+                                           value = fg_alphas[l_idx], 
+                                           channel = "Alpha")
         img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
       }
     }
