@@ -162,38 +162,51 @@ overlayPNG <- function(bg_nii,
         # Determine colors for THIS specific file
         curr_colors <- roi_color[[r_idx]]
         curr_outline <- roi_outline[[r_idx]]
-
+        
+        # Determine labels first to know HOW MANY colors we need
+        if (length(roi_value[[r_idx]]) == 1 && roi_value[[r_idx]] == "all") {
+          labels_to_plot <- sort(unique(as.vector(vol_data[vol_data > 0])))
+        } else {
+          labels_to_plot <- as.numeric(roi_value[[r_idx]])
+        }
+        # DYNAMIC PALETTE CHECK:
+        # If the user passed a function (like viridis or heat.colors)
+        if (is.function(curr_colors)) {
+          # Execute the function to get exactly one color per label
+          curr_colors <- curr_colors(length(labels_to_plot))
+        }
+        
         for (l_idx in seq_along(labels_to_plot)) {
           curr_lab <- labels_to_plot[l_idx]          
           # Mask out only the current label
           lab_mask <- (vol_data == curr_lab) * 1
           r_slice <- switch(curr_p, 
-                            "coronal"  = lab_mask[, curr_s, ],
-                            "axial"    = lab_mask[, , curr_s],
-                            "sagittal" = lab_mask[curr_s, , ])
+                    "coronal"  = lab_mask[, curr_s, ],
+                    "axial"    = lab_mask[, , curr_s],
+                    "sagittal" = lab_mask[curr_s, , ])
           if (sum(r_slice) == 0) next          
           # Determine the pixels to color (Outline vs Solid)
-          if (curr_outline) {
-            interior <- (r_slice > 0) &
-                        (cbind(r_slice[,-1], 0) > 0) &
-                        (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
-                        (rbind(r_slice[-1,], 0) > 0) &
-                        (rbind(0, r_slice[-nrow(r_slice),]) > 0)
-            roi_mx <- (r_slice > 0 & !interior)
-          } else {
-            roi_mx <- (r_slice > 0)
-          }
-          
-          if (sum(roi_mx) > 0) {
-            roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
-            # Map color: Use the label index (l_idx) to pick from the current file's palette
-            # If the palette is shorter than the labels, it cycles back to the first color
-            target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
-            roi_hex[roi_mx] <- target_col            
-            # ... [Magick read/rotate/flop/resize logic remains same] ...
-            roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
-            roi_img <- magick::image_resize(roi_img, geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
-            img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
+            if (curr_outline) {
+              interior <- (r_slice > 0) &
+                          (cbind(r_slice[,-1], 0) > 0) &
+                          (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
+                          (rbind(r_slice[-1,], 0) > 0) &
+                          (rbind(0, r_slice[-nrow(r_slice),]) > 0)
+              roi_mx <- (r_slice > 0 & !interior)
+            } else {
+              roi_mx <- (r_slice > 0)
+            }
+ 
+            if (sum(roi_mx) > 0) {
+              roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
+              # Map color: Modulo ensures we loop back if we have fewer colors than labels
+              target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
+              roi_hex[roi_mx] <- target_col            
+              # Render and composite
+              roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
+              roi_img <- magick::image_resize(roi_img, geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
+              img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
+            }
           }
         }
       }
