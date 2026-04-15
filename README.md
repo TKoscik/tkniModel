@@ -25,9 +25,25 @@ devtools::install_github("TKoscik/tkniModel")
 
 ***
 
+## How to Run
+Since RStudio has substantial process overhead, we reccommend running modelVoxel.R using base R tools such as the linux terminal.  
+Likewise the number of workers that can be effectively used depends on the number of processes R is allowed to start.  
+We recommend you start an R session this way:  
+```bash
+R --max-connections=1024
+```
+Or in a script:  
+```bash
+Rscript --max-connections=1024 my_script.R
+```
+Note, that if workers are killed by your system, the overall process will check the log.nii file and re-initialize workers. This will however slow the overall processing down.  
+
 ## Example Workflow
 
 ```r
+rm(list=ls())
+gc()
+
 library(tkniModel)
 
 # Setup
