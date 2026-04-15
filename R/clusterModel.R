@@ -43,10 +43,10 @@ clusterModel <- function(nii_estimate,
   }
 
   # 4. Copy and Decompress files to scratch -----------------------------------
-  nii_estimate <- prepNii(nii_estimate, "estimate", dir_scratch)
-  nii_test     <- prepNii(nii_test,     "test",     dir_scratch)
-  nii_pval     <- prepNii(nii_pval,     "pval",     dir_scratch)
-  nii_mask     <- prepNii(nii_mask,     "mask",     dir_scratch)
+  nii_estimate <- prepNII(nii_estimate, "estimate", dir_scratch)
+  nii_test     <- prepNII(nii_test,     "test",     dir_scratch)
+  nii_pval     <- prepNII(nii_pval,     "pval",     dir_scratch)
+  nii_mask     <- prepNII(nii_mask,     "mask",     dir_scratch)
 
   # 5. Load Image Metadata ----------------------------------------------------
   # Using nii_estimate as the reference for headers
