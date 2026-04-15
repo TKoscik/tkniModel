@@ -28,6 +28,7 @@ drawMontage <- function(# 1. Structural Inputs
   roi_vol_list = 1,
   roi_value = "all",
   roi_color = "hotpink",
+  roi_outline = TRUE,
 
   # 5. Labels & Scale
   scale = 1,
@@ -94,6 +95,7 @@ drawMontage <- function(# 1. Structural Inputs
              roi_vol_list = roi_vol_list,
              roi_value = roi_value,
              roi_color = roi_color,
+             roi_outline = roi_outline,
              slice_x = slice_indices$x,
              slice_y = slice_indices$y,
              slice_z = slice_indices$z,
