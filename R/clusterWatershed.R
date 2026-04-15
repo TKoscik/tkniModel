@@ -76,7 +76,20 @@ clusterWatershed <- function(nii_pval,
     watershed_map <- peak_seeds_map
     to_flood_mask <- (valid_extent & watershed_map == 0)
     ordered_vox <- which(to_flood_mask)[order(heights[to_flood_mask], decreasing = TRUE)]
-
+    
+    # Neighborhood offsets for 3D connectivity (26-neighbor: faces, edges, corners)
+    if (connectivity == 26) {
+      offsets <- as.matrix(expand.grid(-1:1, -1:1, -1:1))[-14, ] 
+    } else if (connectivity == 18) {
+      # Faces and Edges only (Manhattan distance <= 2)
+      off_grid <- as.matrix(expand.grid(-1:1, -1:1, -1:1))
+      dist_from_center <- rowSums(abs(off_grid))
+      offsets <- off_grid[dist_from_center > 0 & dist_from_center <= 2, ]
+    } else {
+      # 6-neighbor: only faces
+      offsets <- matrix(c(1,0,0, -1,0,0, 0,1,0, 0,-1,0, 0,0,1, 0,0,-1), ncol=3, byrow=TRUE)
+    }
+    
     for (v in ordered_vox) {
       v_coord <- arrayInd(v, dims)
       neighbors_coords <- sweep(offsets, 2, v_coord, "+")
