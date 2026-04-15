@@ -49,9 +49,11 @@ clusterWatershed <- function(nii_pval,
     # 2. Define Directional Bounding -------------------------------------------
     dir_mask <- if(curr_dir == "pos") (est_vol > 0) else (est_vol < 0)
     valid_extent <- (pval_vol <= extent_thresh & mask_vol_data > 0 & dir_mask)
+    valid_extent[is.na(valid_extent)] <- FALSE # Force NAs to FALSE
     valid_peak   <- (pval_vol <= peak_thresh & mask_vol_data > 0 & dir_mask)
+    valid_peak[is.na(valid_peak)] <- FALSE # Force NAs to FALSE
     
-    if (sum(valid_peak) == 0) {
+    if (sum(valid_peak, na.rm = TRUE) == 0) {
       message(sprintf("No significant %s peaks found. Skipping.", curr_dir))
       next
     }
