@@ -138,9 +138,7 @@ overlayPNG <- function(bg_nii,
         # 2. Global Opacity Adjustment
         # This scales the existing alpha channel by your fg_alphas value (0.0 to 1.0)
         # It ensures the 'holes' stay transparent while the 'solid' bits become see-through
-        fg_trans <- magick::image_evaluate(fg_trans, operator = "Multiply", 
-                                           value = fg_alphas[l_idx], 
-                                           channel = "Alpha")
+        fg_trans <- magick::image_fx(fg_trans, expression = paste0("a*", fg_alphas[l_idx]), channel = "alpha")      
         img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
       }
     }
