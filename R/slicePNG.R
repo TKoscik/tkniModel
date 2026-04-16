@@ -182,7 +182,8 @@ slicePNG <- function(nii_data, nii_vol = 1,
     data_img <- magick::image_resize(data_img,
       geometry = magick::geometry_size_pixels(width = target_w,
                                               height = target_h,
-                                              preserve_aspect = FALSE))
+                                              preserve_aspect = FALSE),
+                                    filter = "Catrom")
 
     # F. Create the final canvas and layer the pre-masked data over it ---------
     bg_canvas <- magick::image_blank(target_w, target_h, color = bg_color)
@@ -233,7 +234,8 @@ slicePNG <- function(nii_data, nii_vol = 1,
       mask_img <- magick::image_read(mask_hex)
       mask_img <- magick::image_flop(magick::image_rotate(mask_img, 270))
       mask_img <- magick::image_resize(mask_img,
-                                       geometry = magick::geometry_size_pixels(target_w, target_h, FALSE))
+                                       geometry = magick::geometry_size_pixels(target_w, target_h, FALSE),
+                                       filter="Catrom")
       mask_img <- magick::image_convert(mask_img, colorspace = "gray")
       magick::image_write(mask_img, path = file.path(dir_save, paste0(base_name, "_mask.png")))
     }
