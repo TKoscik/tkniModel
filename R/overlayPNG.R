@@ -336,6 +336,8 @@ overlayPNG <- function(bg_nii,
     out_path <- file.path(dir_save, paste0(current_base_name, ".png"))
     magick::image_write(img_stack, out_path)
     final_paths <- c(final_paths, out_path)
+    rm(img_stack)
+    if (s_idx %% 10 == 0) gc() 
   }
   temp_pngs <- list.files(dir_scratch, pattern = "\\.png$", full.names = TRUE)
   file.remove(temp_pngs)
