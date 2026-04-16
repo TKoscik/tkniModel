@@ -29,7 +29,7 @@ overlayPNG <- function(bg_nii,
                        file_name = NULL,
                        dir_scratch,
                        dir_save) {
-
+  
   # Setup Local Files ----------------------------------------------------------
   if (missing(bg_mask)) { bg_mask <- NULL }
   n_fg <- 0
@@ -46,7 +46,7 @@ overlayPNG <- function(bg_nii,
     if (length(roi_vol_list) != n_rois) { roi_vol_list <- rep(roi_vol_list[1], n_rois) }
     if (length(roi_color) != n_rois) { roi_color <- rep(roi_color, n_rois) }
   }
-
+  
   # 3. Resolve Background & Setup Canvas ---------------------------------------
   if (missing(bg_threshold_value)) { bg_threshold_value <- NULL }
   bg_paths <- slicePNG(nii_data = bg_nii, nii_mask = bg_mask,
@@ -59,7 +59,7 @@ overlayPNG <- function(bg_nii,
                        draw_coords = draw_coords, draw_label_layer = TRUE,
                        file_name = "bg",
                        dir_scratch = dir_scratch, dir_save = dir_scratch)
-
+  
   # 4. Foreground Stacking -----------------------------------------------------
   if (n_fg > 0) {
     if (missing(fg_threshold_pct) & missing(fg_threshold_value)) {
@@ -89,19 +89,19 @@ overlayPNG <- function(bg_nii,
     fg_results <- list()
     for (i in 1:n_fg) {
       fg_results[[i]] <- slicePNG(nii_data = fg_nii_list[[i]],
-                           nii_mask = fg_mask_list[[i]],
-                           nii_vol = fg_vol_list[i],
-                           mask_vol = fg_mask_vol_list[i],
-                           slice_x = slice_x, slice_y = slice_y, slice_z = slice_z,
-                           color = fg_colors[[i]], bg_color=canvas_color,
-                           threshold_pct = fg_threshold_pct[[i]],
-                           threshold_value = fg_threshold_value[[i]],
-                           scale = scale, draw_mask = TRUE, draw_cbar = draw_cbar,
-                           file_name = sprintf("fg%d", i),
-                           dir_scratch = dir_scratch, dir_save = dir_scratch)
+                                  nii_mask = fg_mask_list[[i]],
+                                  nii_vol = fg_vol_list[i],
+                                  mask_vol = fg_mask_vol_list[i],
+                                  slice_x = slice_x, slice_y = slice_y, slice_z = slice_z,
+                                  color = fg_colors[[i]], bg_color=canvas_color,
+                                  threshold_pct = fg_threshold_pct[[i]],
+                                  threshold_value = fg_threshold_value[[i]],
+                                  scale = scale, draw_mask = TRUE, draw_cbar = draw_cbar,
+                                  file_name = sprintf("fg%d", i),
+                                  dir_scratch = dir_scratch, dir_save = dir_scratch)
     }
   }
-
+  
   # Composite FG on BG ---------------------------------------------------------
   ## Pre-load ROI volumes to avoid hitting the disk repeatedly
   roi_vols <- list()
@@ -110,15 +110,15 @@ overlayPNG <- function(bg_nii,
       nifti.io::read.nii.volume(prepNII(roi_nii_list[[i]], "roi", dir_scratch), roi_vol_list[i])
     })
   }
-
+  
   # Recreate the master work list so we know the plane/slice for each path
   work_list <- list()
   if(!is.null(slice_x)) work_list <- c(work_list, lapply(slice_x, function(s) list(p="sagittal", s=s)))
   if(!is.null(slice_y)) work_list <- c(work_list, lapply(slice_y, function(s) list(p="coronal", s=s)))
   if(!is.null(slice_z)) work_list <- c(work_list, lapply(slice_z, function(s) list(p="axial", s=s)))
-
+  
   final_paths <- character()
-
+  
   # --- Persistence Check ---
   # Give the file system a split second to catch up with slicePNG's writes
   Sys.sleep(0.5) 
@@ -130,11 +130,26 @@ overlayPNG <- function(bg_nii,
     message(sprintf("Waiting for %d delayed files...", missing_count))
     Sys.sleep(1.5) # Extended wait if files are missing
   }
-                                                         
+  
+  # Color Bar Prep & Export ---
+  master_cbar_ready <- NULL
+  cbar_files <- list.files(dir_scratch, pattern = "_cbar\\.png$", full.names = TRUE)
+  
+  if (!is.null(draw_cbar) && length(cbar_files) > 0) {
+    # If not baking into slices, export the bars once for the final montage
+    if (!apply_labels) {
+      file.copy(cbar_files, file.path(dir_save, basename(cbar_files)), overwrite = TRUE)
+    }
+    # Read unique bars into memory once to avoid disk I/O in the loop
+    # We use unique() in case multiple planes generated identical bars
+    master_cbar_ready <- magick::image_read(unique(cbar_files))
+    master_cbar_ready <- magick::image_background(master_cbar_ready, canvas_color)
+  }
+  
   for (s_idx in seq_along(bg_paths)) {
     curr_p <- work_list[[s_idx]]$p
     curr_s <- work_list[[s_idx]]$s
-
+    
     # A. Base Anatomy
     img_stack <- magick::image_read(bg_paths[s_idx])
     img_stack <- magick::image_convert(img_stack, type = "truecoloralpha")
@@ -155,7 +170,7 @@ overlayPNG <- function(bg_nii,
         img_stack <- magick::image_composite(img_stack, fg_trans, operator = "Over")
       }
     }
-
+    
     # C. Add ROI Layers --------------------------------------------------------
     if (!missing(roi_nii_list)) {
       n_roi_files <- length(roi_vols)
@@ -199,37 +214,37 @@ overlayPNG <- function(bg_nii,
           # Mask out only the current label
           lab_mask <- (vol_data == curr_lab) * 1
           r_slice <- switch(curr_p, 
-                    "coronal"  = lab_mask[, curr_s, ],
-                    "axial"    = lab_mask[, , curr_s],
-                    "sagittal" = lab_mask[curr_s, , ])
+                            "coronal"  = lab_mask[, curr_s, ],
+                            "axial"    = lab_mask[, , curr_s],
+                            "sagittal" = lab_mask[curr_s, , ])
           if (sum(r_slice) == 0) next          
           # Determine the pixels to color (Outline vs Solid)
-            if (curr_outline) {
-              interior <- (r_slice > 0) &
-                          (cbind(r_slice[,-1], 0) > 0) &
-                          (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
-                          (rbind(r_slice[-1,], 0) > 0) &
-                          (rbind(0, r_slice[-nrow(r_slice),]) > 0)
-              roi_mx <- (r_slice > 0 & !interior)
-            } else {
-              roi_mx <- (r_slice > 0)
-            }
- 
-            if (sum(roi_mx) > 0) {
-              roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
-              # Map color: Modulo ensures we loop back if we have fewer colors than labels
-              target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
-              roi_hex[roi_mx] <- target_col            
-              # Render and composite
-              roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
-              roi_img <- magick::image_resize(roi_img,
-                geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
-              img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
-            }
+          if (curr_outline) {
+            interior <- (r_slice > 0) &
+              (cbind(r_slice[,-1], 0) > 0) &
+              (cbind(0, r_slice[,-ncol(r_slice)]) > 0) &
+              (rbind(r_slice[-1,], 0) > 0) &
+              (rbind(0, r_slice[-nrow(r_slice),]) > 0)
+            roi_mx <- (r_slice > 0 & !interior)
+          } else {
+            roi_mx <- (r_slice > 0)
+          }
+          
+          if (sum(roi_mx) > 0) {
+            roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
+            # Map color: Modulo ensures we loop back if we have fewer colors than labels
+            target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
+            roi_hex[roi_mx] <- target_col            
+            # Render and composite
+            roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
+            roi_img <- magick::image_resize(roi_img,
+                                            geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
+            img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
           }
         }
       }
-
+    }
+    
     # D. Add labels if requested
     side_path <- file.path(dir_scratch, sprintf("label_%s_side.png", curr_p))
     scale_path <- file.path(dir_scratch, sprintf("label_%s_scale.png", curr_p))
@@ -251,44 +266,65 @@ overlayPNG <- function(bg_nii,
         file.copy(scale_path, file.path(dir_save, basename(scale_path)), overwrite = TRUE)
       }
     }
-
-
-    # E. Append Color Bar(s) --------------------------------------------------
-    if (!is.null(draw_cbar)) {
-      cbar_files <- list.files(dir_scratch, pattern = "_cbar\\.png$", full.names = TRUE)
-      if (length(cbar_files) > 0) {
-        cbars <- magick::image_read(cbar_files)
-        info <- magick::image_info(img_stack)
-        cbars_list <- list()
-        for(i in 1:length(cbars)) {
-          bar_info <- magick::image_info(cbars[i])
-          if (draw_cbar == "vertical") {
-            cbars_list[[i]] <- magick::image_extent(cbars[i],
-                                                    geometry = sprintf("%dx%d", bar_info$width, info$height),
-                                                    gravity = "Center",
-                                                    color = canvas_color)
-          } else {
-            cbars_list[[i]] <- magick::image_extent(cbars[i],
-                                                    geometry = sprintf("%dx%d", info$width, bar_info$height),
-                                                    gravity = "Center",
-                                                    color = canvas_color)
-          }
-        }
-        cbars_ready <- do.call(c, cbars_list)
-        if (apply_labels) {
-          if (draw_cbar == "vertical") {
-            cbar_strip <- magick::image_append(cbars_ready, stack = FALSE)
-            img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = FALSE)
-          } else {
-            cbar_strip <- magick::image_append(cbars_ready, stack = TRUE)
-            img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = TRUE)
-          }
+    
+    # E. Append Color Bar(s) ---------------------------------------------------
+    if (apply_labels && !is.null(master_cbar_ready)) {
+      info <- magick::image_info(img_stack)
+      cbars_list <- list()
+      # Center the pre-loaded bars against the current slice dimensions
+      for(i in 1:length(master_cbar_ready)) {
+        bar_info <- magick::image_info(master_cbar_ready[i])
+        if (draw_cbar == "vertical") {
+          cbars_list[[i]] <- magick::image_extent(master_cbar_ready[i],
+                                                  geometry = sprintf("%dx%d", bar_info$width, info$height),
+                                                  gravity = "Center", color = canvas_color)
         } else {
-          file.copy(cbar_files, file.path(dir_save, basename(cbar_files)), overwrite = TRUE)
+          cbars_list[[i]] <- magick::image_extent(master_cbar_ready[i],
+                                                  geometry = sprintf("%dx%d", info$width, bar_info$height),
+                                                  gravity = "Center", color = canvas_color)
         }
       }
+      # Assemble and attach
+      cbars_padded <- do.call(c, cbars_list)
+      is_vert <- (draw_cbar == "vertical")
+      cbar_strip <- magick::image_append(cbars_padded, stack = !is_vert) # Stack opposite of orientation
+      img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = !is_vert)
     }
-
+    # if (!is.null(draw_cbar)) {
+    #   cbar_files <- list.files(dir_scratch, pattern = "_cbar\\.png$", full.names = TRUE)
+    #   if (length(cbar_files) > 0) {
+    #     cbars <- magick::image_read(cbar_files)
+    #     info <- magick::image_info(img_stack)
+    #     cbars_list <- list()
+    #     for(i in 1:length(cbars)) {
+    #       bar_info <- magick::image_info(cbars[i])
+    #       if (draw_cbar == "vertical") {
+    #         cbars_list[[i]] <- magick::image_extent(cbars[i],
+    #                                                 geometry = sprintf("%dx%d", bar_info$width, info$height),
+    #                                                 gravity = "Center",
+    #                                                 color = canvas_color)
+    #       } else {
+    #         cbars_list[[i]] <- magick::image_extent(cbars[i],
+    #                                                 geometry = sprintf("%dx%d", info$width, bar_info$height),
+    #                                                 gravity = "Center",
+    #                                                 color = canvas_color)
+    #       }
+    #     }
+    #     cbars_ready <- do.call(c, cbars_list)
+    #     if (apply_labels) {
+    #       if (draw_cbar == "vertical") {
+    #         cbar_strip <- magick::image_append(cbars_ready, stack = FALSE)
+    #         img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = FALSE)
+    #       } else {
+    #         cbar_strip <- magick::image_append(cbars_ready, stack = TRUE)
+    #         img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = TRUE)
+    #       }
+    #     } else {
+    #       file.copy(cbar_files, file.path(dir_save, basename(cbar_files)), overwrite = TRUE)
+    #     }
+    #   }
+    # }
+    
     # Save overlay -------------------------------------------------------------
     # Determine prefix
     if (is.null(file_name) || file_name == "") {
