@@ -28,6 +28,7 @@ overlayPNG <- function(bg_nii,
                        apply_labels = FALSE,
                        file_name = NULL,
                        dir_scratch,
+                       cleanup = TRUE,
                        dir_save) {
   
   # Setup Local Files ----------------------------------------------------------
@@ -290,40 +291,6 @@ overlayPNG <- function(bg_nii,
       cbar_strip <- magick::image_append(cbars_padded, stack = !is_vert) # Stack opposite of orientation
       img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = !is_vert)
     }
-    # if (!is.null(draw_cbar)) {
-    #   cbar_files <- list.files(dir_scratch, pattern = "_cbar\\.png$", full.names = TRUE)
-    #   if (length(cbar_files) > 0) {
-    #     cbars <- magick::image_read(cbar_files)
-    #     info <- magick::image_info(img_stack)
-    #     cbars_list <- list()
-    #     for(i in 1:length(cbars)) {
-    #       bar_info <- magick::image_info(cbars[i])
-    #       if (draw_cbar == "vertical") {
-    #         cbars_list[[i]] <- magick::image_extent(cbars[i],
-    #                                                 geometry = sprintf("%dx%d", bar_info$width, info$height),
-    #                                                 gravity = "Center",
-    #                                                 color = canvas_color)
-    #       } else {
-    #         cbars_list[[i]] <- magick::image_extent(cbars[i],
-    #                                                 geometry = sprintf("%dx%d", info$width, bar_info$height),
-    #                                                 gravity = "Center",
-    #                                                 color = canvas_color)
-    #       }
-    #     }
-    #     cbars_ready <- do.call(c, cbars_list)
-    #     if (apply_labels) {
-    #       if (draw_cbar == "vertical") {
-    #         cbar_strip <- magick::image_append(cbars_ready, stack = FALSE)
-    #         img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = FALSE)
-    #       } else {
-    #         cbar_strip <- magick::image_append(cbars_ready, stack = TRUE)
-    #         img_stack <- magick::image_append(c(img_stack, cbar_strip), stack = TRUE)
-    #       }
-    #     } else {
-    #       file.copy(cbar_files, file.path(dir_save, basename(cbar_files)), overwrite = TRUE)
-    #     }
-    #   }
-    # }
     
     # Save overlay -------------------------------------------------------------
     # Determine prefix
@@ -339,7 +306,6 @@ overlayPNG <- function(bg_nii,
     rm(img_stack)
     if (s_idx %% 10 == 0) gc() 
   }
-  temp_pngs <- list.files(dir_scratch, pattern = "\\.png$", full.names = TRUE)
-  file.remove(temp_pngs)
+  if (cleanup) { unlink(dir_scratch, recursive = TRUE) }
   return(final_paths)
 }
