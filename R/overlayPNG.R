@@ -121,14 +121,13 @@ overlayPNG <- function(bg_nii,
 
   # --- Persistence Check ---
   # Give the file system a split second to catch up with slicePNG's writes
-  if (verbose) message("Verifying scratch files...")
   Sys.sleep(0.5) 
   # Verify that the expected number of bg_paths actually exists
   # This prevents the "index=0; extent=0" error if a read fails
   actual_bg <- file.exists(bg_paths)
   missing_count <- sum(!file.exists(bg_paths))
   if (missing_count > 0) {
-    if (verbose) message(sprintf("Waiting for %d delayed files...", missing_count))
+    message(sprintf("Waiting for %d delayed files...", missing_count))
     Sys.sleep(1.5) # Extended wait if files are missing
   }
                                                          
