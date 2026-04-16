@@ -14,7 +14,8 @@ slicePNG <- function(nii_data, nii_vol = 1,
                      draw_label_layer = FALSE,
                      file_name = NULL,
                      dir_scratch,
-                     dir_save) {
+                     dir_save,
+                     cleanup = TRUE) {
 
   if (!is.null(threshold_pct) && !is.null(threshold_value)) {
     stop("Provide either threshold_pct OR threshold_value, not both.")
@@ -281,6 +282,8 @@ slicePNG <- function(nii_data, nii_vol = 1,
     cbar_out_path <- file.path(dir_save, cbar_name)
     magick::image_write(cbar_img, path = cbar_out_path, format = "png")
   }
-
+  if (cleanup && !is.null(dir_scratch) && dir_scratch != "" && dir_scratch != getwd()) {
+    unlink(dir_scratch, recursive = TRUE)
+  }
   return(output_paths)
 }
