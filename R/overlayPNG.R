@@ -306,6 +306,8 @@ overlayPNG <- function(bg_nii,
     rm(img_stack)
     if (s_idx %% 10 == 0) gc() 
   }
-  if (cleanup) { unlink(dir_scratch, recursive = TRUE) }
+  if (cleanup && !is.null(dir_scratch) && dir_scratch != "" && dir_scratch != getwd()) {
+    unlink(dir_scratch, recursive = TRUE)
+  }
   return(final_paths)
 }
