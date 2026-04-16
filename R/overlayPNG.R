@@ -59,7 +59,8 @@ overlayPNG <- function(bg_nii,
                        draw_scale = draw_scale, draw_side = draw_side,
                        draw_coords = draw_coords, draw_label_layer = TRUE,
                        file_name = "bg",
-                       dir_scratch = dir_scratch, dir_save = dir_scratch)
+                       dir_scratch = sprintf("%s/slice_tmp", dir_scratch),
+                       dir_save = dir_scratch)
   
   # 4. Foreground Stacking -----------------------------------------------------
   if (n_fg > 0) {
@@ -99,7 +100,8 @@ overlayPNG <- function(bg_nii,
                                   threshold_value = fg_threshold_value[[i]],
                                   scale = scale, draw_mask = TRUE, draw_cbar = draw_cbar,
                                   file_name = sprintf("fg%d", i),
-                                  dir_scratch = dir_scratch, dir_save = dir_scratch)
+                                  dir_scratch = sprintf("%s/slice_tmp", dir_scratch),
+                                  dir_save = dir_scratch)
     }
   }
   
