@@ -105,6 +105,7 @@ slicePNG <- function(nii_data, nii_vol = 1,
                                         gravity = "southeast", color = "white", size = base_font,
                                         location = sprintf("+%d+%d", round(padding + (bar_w_px/2) - (base_font)), padding))
         magick::image_write(c_img, file.path(dir_scratch, sprintf("label_%s_scale.png", p)))
+        list.files(dir_scratch)
         if (draw_label_layer) {
           magick::image_write(c_img, file.path(dir_save, sprintf("label_%s_scale.png", p)))
         }
