@@ -41,7 +41,6 @@ slicePNG <- function(nii_data, nii_vol = 1,
   } else {
     m_vol <- img_vol * 0 + 1
   }
-  print(str(m_vol))
 
   # 4. Resolve Thresholds ------------------------------------------------------
   if(!is.null(local_mask)) {
@@ -60,6 +59,10 @@ slicePNG <- function(nii_data, nii_vol = 1,
     if (!is.na(threshold_value[2])) { v_max <- threshold_value[2] }
   }
 
+  if (is.null(local_mask)) {
+    m_vol[img_vol < min(c(v_min, v_max)) & img_vol > max(c(v_min, v_max))] <- 0
+  }
+  
   # 5. Create the slice extraction loop ----------------------------------------
   work_list <- list()
   if(!is.null(slice_x)) work_list <- c(work_list, lapply(slice_x, function(s) list(p="sagittal", s=s)))
@@ -146,10 +149,6 @@ slicePNG <- function(nii_data, nii_vol = 1,
     } else {
       slice_data <- img_vol[curr_slice, , ]
       phys_w <- dims[2] * spacing[2]; phys_h <- dims[3] * spacing[3]
-    }
-
-    if (is.null(local_mask)) {
-      m_vol <- (slice_data[slice_data >= min(c(v_min, v_max)) & slice_data <= max(c(v_min, v_max))] != 0) * 1
     }
 
     # B. Generate Main Image ---------------------------------------------------
