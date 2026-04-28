@@ -43,6 +43,7 @@ slicePNG <- function(nii_data, nii_vol = 1,
     m_vol <- img_vol * 0 + 1
   }
   print(str(m_vol))
+  print("check")
 
   # 4. Resolve Thresholds ------------------------------------------------------
   if(!is.null(local_mask)) {
