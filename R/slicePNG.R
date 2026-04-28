@@ -39,6 +39,8 @@ slicePNG <- function(nii_data, nii_vol = 1,
   if (!is.null(local_mask)) {
     m_vol <- nifti.io::read.nii.volume(local_mask, mask_vol)
     m_vol <- ((m_vol != 0) & (!is.na(img_vol)))*1
+  } else {
+    m_vol <- nifti.io::read.nii.volume(local_nii, nii_vol) * 0 + 1
   }
 
   # 4. Resolve Thresholds ------------------------------------------------------
