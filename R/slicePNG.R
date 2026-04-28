@@ -105,7 +105,6 @@ slicePNG <- function(nii_data, nii_vol = 1,
                                         gravity = "southeast", color = "white", size = base_font,
                                         location = sprintf("+%d+%d", round(padding + (bar_w_px/2) - (base_font)), padding))
         magick::image_write(c_img, file.path(dir_scratch, sprintf("label_%s_scale.png", p)))
-        print(list.files(dir_scratch))
         if (draw_label_layer) {
           magick::image_write(c_img, file.path(dir_save, sprintf("label_%s_scale.png", p)))
         }
@@ -208,7 +207,7 @@ slicePNG <- function(nii_data, nii_vol = 1,
       }
       ## add side annotation
       if (draw_side & curr_plane %in% c("coronal", "axial")) {
-        side_tmp <- magick::image_read(file.path(dir_save, sprintf("label_%s_scale.png", curr_plane)))
+        side_tmp <- magick::image_read(file.path(dir_scratch, sprintf("label_%s_side.png", curr_plane)))
         img <- magick::image_composite(img, side_tmp, operator = "Over")
       }
     }
