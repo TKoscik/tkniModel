@@ -5,7 +5,7 @@ drawMontage <- function(# 1. Structural Inputs
   bg_mask_vol = 1,
 
   # 2. Thresholding & Appearance
-  bg_threshold_pct = c(0.025, 0.975),
+  bg_threshold_pct = NULL,
   bg_threshold_value = NULL,
   bg_color = c("black", "white"),
   canvas_color = "black",
