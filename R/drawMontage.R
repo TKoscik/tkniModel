@@ -99,6 +99,7 @@ drawMontage <- function(# 1. Structural Inputs
              slice_x = slice_indices$x,
              slice_y = slice_indices$y,
              slice_z = slice_indices$z,
+             scale = scale,
              draw_side = draw_side,
              draw_coords = draw_coords,
              draw_scale = draw_scale,
