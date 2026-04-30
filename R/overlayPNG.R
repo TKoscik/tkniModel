@@ -241,11 +241,18 @@ overlayPNG <- function(bg_nii,
             target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
             roi_hex[roi_mx] <- target_col
             # Render and composite
-            roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
-            roi_img <- magick::image_resize(roi_img,
-              geometry = magick::geometry_size_pixels(width=info$width, height=info$height, FALSE))
-            roi_img <- magick::image_fx(roi_img, expression = paste0("a*", roi_alpha[r_idx]), channel = "alpha")
-            img_stack <- magick::image_composite(img_stack, roi_img, operator="Over")
+            # 1. Read and immediately convert to ensure alpha channel exists
+            roi_img <- magick::image_read(roi_hex)
+            roi_img <- magick::image_convert(roi_img, type = "truecoloralpha")
+            # 2. Re-orient and resize as before
+            roi_img <- magick::image_flop(magick::image_rotate(roi_img, 270))
+            roi_img <- magick::image_resize(roi_img, 
+              geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
+            # 3. Apply alpha scaling
+            # Ensure roi_alphas[r_idx] is passed correctly from the setup
+            roi_img <- magick::image_fx(roi_img, expression = paste0(roi_alpha[r_idx], "*a"), channel = "alpha")
+            # 4. Composite
+            img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
           }
         }
       }
