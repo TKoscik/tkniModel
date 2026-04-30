@@ -17,7 +17,8 @@
               fg_colors = list(c("cyan", "blue"), c("red", "yellow")),
               fg_threshold_pct = NULL, fg_threshold_value = NULL,
               fg_alphas = 1, roi_nii_list = NULL, roi_vol_list = 1,
-              roi_value = "all", roi_color = "hotpink", scale = 1,
+              roi_value = "all", roi_color = "hotpink", roi_alphas = 1, roi_outline,
+              scale = 1,
               draw_side = FALSE, draw_coords = FALSE, draw_scale = FALSE,
               draw_cbar = NULL, cbar_location = "east",
               file_name = "montage", dir_scratch = NULL,
@@ -40,6 +41,8 @@
   \item{roi_nii_list, roi_vol_list}{Lists of paths and volume indices for ROI outlining.}
   \item{roi_value}{Character/Numeric. Specific ROI label to outline.}
   \item{roi_color}{Character vector. Colors for ROI outlines.}
+  \item{roi_alpha}{Numeric vector. Opacity (0-1) for each ROI layer.}
+  \item{roi_outline}{Logical or list. Whether to render ROIs as outlines (\code{TRUE}) or solid blobs (\code{FALSE}).}
   \item{scale}{Numeric. Pixels per mm for physical scaling.}
   \item{draw_side}{Logical. If TRUE, adds an orientation arrow template to the montage.}
   \item{draw_coords}{Logical. If TRUE, bakes mm coordinates onto every slice.}
