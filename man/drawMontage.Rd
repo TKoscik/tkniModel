@@ -17,7 +17,7 @@
               fg_colors = list(c("cyan", "blue"), c("red", "yellow")),
               fg_threshold_pct = NULL, fg_threshold_value = NULL,
               fg_alphas = 1, roi_nii_list = NULL, roi_vol_list = 1,
-              roi_value = "all", roi_color = "hotpink", roi_alphas = 1, roi_outline,
+              roi_value = "all", roi_color = "hotpink", roi_alpha = 1, roi_outline,
               scale = 1,
               draw_side = FALSE, draw_coords = FALSE, draw_scale = FALSE,
               draw_cbar = NULL, cbar_location = "east",
