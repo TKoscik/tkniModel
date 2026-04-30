@@ -17,7 +17,7 @@ overlayPNG(bg_nii, bg_mask, bg_vol = 1, bg_mask_vol = 1,
            fg_colors = list(c("cyan", "blue"), c("red", "yellow")), 
            fg_threshold_pct, fg_threshold_value, fg_alphas = 1, 
            roi_nii_list, roi_vol_list = 1, roi_value = "all", 
-           roi_color = "hotpink", roi_outline = TRUE,
+           roi_color = "hotpink", roi_alpha = 1, roi_outline = TRUE,
            slice_x = NULL, slice_y = NULL, slice_z = NULL, 
            scale = 1, draw_side = FALSE, draw_coords = FALSE, 
            draw_scale = FALSE, draw_cbar = NULL, 
@@ -39,6 +39,7 @@ overlayPNG(bg_nii, bg_mask, bg_vol = 1, bg_mask_vol = 1,
   \item{roi_nii_list, roi_vol_list}{Lists of paths and volume indices for ROI files.}
   \item{roi_value}{List or Vector. Labels to extract from each ROI file. Use \code{"all"} to process every unique non-zero label in a file.}
   \item{roi_color}{List or Vector. Colors for each ROI label. If a list of vectors is provided, colors are mapped to labels within each file.}
+  \item{roi_alpha}{Numeric vector. Opacity (0-1) for each ROI layer. Matches the length of \code{roi_nii_list}.}
   \item{roi_outline}{List or Logical. Whether to render ROIs as outlines (\code{TRUE}) or solid blobs (\code{FALSE}). Can be a list matching \code{roi_nii_list}.}
   \item{slice_x, slice_y, slice_z}{Numeric vectors. Slices to render across the three anatomical planes.}
   \item{scale}{Numeric. Pixels per mm for physical scaling.}
