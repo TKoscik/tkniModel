@@ -18,6 +18,7 @@ overlayPNG <- function(bg_nii,
                        roi_vol_list = 1,
                        roi_value = "all",
                        roi_color = "hotpink",
+                       roi_alpha = 1, 
                        roi_outline = TRUE,
                        slice_x = NULL, slice_y = NULL, slice_z = NULL,
                        scale = 1,
@@ -46,6 +47,7 @@ overlayPNG <- function(bg_nii,
     n_rois <- length(roi_nii_list)
     if (length(roi_vol_list) != n_rois) { roi_vol_list <- rep(roi_vol_list[1], n_rois) }
     if (length(roi_color) != n_rois) { roi_color <- rep(roi_color, n_rois) }
+    if (length(roi_alpha) != n_rois) { roi_alpha <- rep(roi_alpha, n_rois) } # Add this line
   }
   
   # 3. Resolve Background & Setup Canvas ---------------------------------------
@@ -237,12 +239,13 @@ overlayPNG <- function(bg_nii,
             roi_hex <- matrix("transparent", nrow = nrow(r_slice), ncol = ncol(r_slice))            
             # Map color: Modulo ensures we loop back if we have fewer colors than labels
             target_col <- curr_colors[((l_idx - 1) %% length(curr_colors)) + 1]            
-            roi_hex[roi_mx] <- target_col            
+            roi_hex[roi_mx] <- target_col
             # Render and composite
             roi_img <- magick::image_flop(magick::image_rotate(magick::image_read(roi_hex), 270))
             roi_img <- magick::image_resize(roi_img,
-                                            geometry = magick::geometry_size_pixels(width = info$width, height = info$height, FALSE))
-            img_stack <- magick::image_composite(img_stack, roi_img, operator = "Over")
+              geometry = magick::geometry_size_pixels(width=info$width, height=info$height, FALSE))
+            roi_img <- magick::image_fx(roi_img, expression = paste0("a*", roi_alpha[r_idx]), channel = "alpha")
+            img_stack <- magick::image_composite(img_stack, roi_img, operator="Over")
           }
         }
       }
