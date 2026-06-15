@@ -294,7 +294,7 @@ modelVoxel <- function(nii_data,
             #Sys.sleep(runif(1, 0, 0.01))
             write.nii.voxel(log.nii, coords, 2)
           }, error = function(e) {
-            error_msg <- sprintf("Voxel %d failed: %s", X, e$message)
+            error_msg <- sprintf("Voxel %d failed: %s", i, e$message)
             warning(error_msg)
             write(error_msg, file = file.path(dir_scratch, "failed_voxels.log"), append = TRUE)
             write.nii.voxel(log.nii, coords, 3)
