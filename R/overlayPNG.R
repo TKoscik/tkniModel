@@ -105,6 +105,7 @@ overlayPNG <- function(bg_nii,
                                   dir_scratch = sprintf("%s/slice_tmp", dir_scratch),
                                   dir_save = dir_scratch)
     }
+    print(3)
   }
   
   # Composite FG on BG ---------------------------------------------------------
