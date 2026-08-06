@@ -38,7 +38,7 @@ overlayPNG <- function(bg_nii,
   if (!missing(fg_nii_list)) {
     n_fg <- length(fg_nii_list)
     if (!missing(fg_mask_list) & length(fg_mask_list) == 1) {
-      fg_mask_list <- rep(fg_mask_list, i)
+      fg_mask_list <- rep(fg_mask_list, n_fg)
     } else {
       local_fg_mask <- rep(NA,n_fg)
     }
@@ -49,7 +49,7 @@ overlayPNG <- function(bg_nii,
     if (length(roi_color) != n_rois) { roi_color <- rep(roi_color, n_rois) }
     if (length(roi_alpha) != n_rois) { roi_alpha <- rep(roi_alpha, n_rois) } # Add this line
   }
-  print(1)
+  
   # 3. Resolve Background & Setup Canvas ---------------------------------------
   if (missing(bg_threshold_value)) { bg_threshold_value <- NULL }
   bg_paths <- slicePNG(nii_data = bg_nii, nii_mask = bg_mask,
@@ -63,7 +63,7 @@ overlayPNG <- function(bg_nii,
                        file_name = "bg",
                        dir_scratch = sprintf("%s/slice_tmp", dir_scratch),
                        dir_save = dir_scratch)
-  print(2)
+  
   # 4. Foreground Stacking -----------------------------------------------------
   if (n_fg > 0) {
     if (missing(fg_threshold_pct) & missing(fg_threshold_value)) {
@@ -105,7 +105,6 @@ overlayPNG <- function(bg_nii,
                                   dir_scratch = sprintf("%s/slice_tmp", dir_scratch),
                                   dir_save = dir_scratch)
     }
-    print(3)
   }
   
   # Composite FG on BG ---------------------------------------------------------
