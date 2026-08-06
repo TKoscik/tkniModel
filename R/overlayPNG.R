@@ -49,7 +49,7 @@ overlayPNG <- function(bg_nii,
     if (length(roi_color) != n_rois) { roi_color <- rep(roi_color, n_rois) }
     if (length(roi_alpha) != n_rois) { roi_alpha <- rep(roi_alpha, n_rois) } # Add this line
   }
-  print("CHECK IF PUSH IS WORKING NOW")
+
   # 3. Resolve Background & Setup Canvas ---------------------------------------
   if (missing(bg_threshold_value)) { bg_threshold_value <- NULL }
   bg_paths <- slicePNG(nii_data = bg_nii, nii_mask = bg_mask,
