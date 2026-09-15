@@ -26,7 +26,7 @@ devtools::install_github("TKoscik/tkniModel")
 ***
 
 ## How to Run
-Since RStudio has substantial process overhead, we reccommend running modelVoxel.R using base R tools such as the linux terminal.  
+**Since RStudio has substantial process overhead, we reccommend running modelVoxel.R using base R tools such as the linux terminal.**  
 Likewise the number of workers that can be effectively used depends on the number of processes R is allowed to start.  
 We recommend you start an R session this way:  
 ```bash
