@@ -65,19 +65,18 @@ modelVoxel <- function(nii_data,
   }
   
   ## Setup ordered factors (ordered/specific levels)
-  # Expected format: c("variable:levels,labels,", etc...)
   if (!missing(var_factor) && !is.null(var_factor)) {
     if (verbose) { message("Setting up variables as factors") }
     for (item in var_factor) {
       parts <- unlist(strsplit(item, ":"))
       var_name <- parts[1]
       if (var_name %in% names(pf)) {
-        if (length(parts) == 1) { # Case: "sex" (Just convert to factor)
+        if (length(parts) == 1) { 
           pf[[var_name]] <- as.factor(pf[[var_name]])
-        } else if (length(parts) == 2) { # Case: "sex:male,female"
+        } else if (length(parts) == 2) { 
           levs <- unlist(strsplit(parts[2], ","))
           pf[[var_name]] <- factor(pf[[var_name]], levels = levs)
-        } else if (length(parts) == 3) { # Case: "sex:1,2:male,female"
+        } else if (length(parts) == 3) { 
           levs   <- unlist(strsplit(parts[2], ","))
           labls  <- unlist(strsplit(parts[3], ","))
           pf[[var_name]] <- factor(pf[[var_name]], levels = levs, labels = labls)
@@ -89,135 +88,154 @@ modelVoxel <- function(nii_data,
     }
   }
   
-  # Match DF data and NII data -------------------------------------------------
-  ## 1. Parse id_var into a mapping (e.g., participant_id -> sub)
-  if (verbose) { message("Matching participants in DF and NII") }
+  # Match DF data and NII data (Multi-dataset support) -------------------------
+  if (verbose) { message("Matching participants in DF and NII datasets") }
   id_map <- list()
   for (item in id_var) {
     parts <- unlist(strsplit(item, ":"))
     if (length(parts) == 2) {
       id_map[[parts[1]]] <- parts[2]
-    } else { # Defaults for standard BIDS
+    } else { 
       if (parts[1] == "participant_id") id_map[[parts[1]]] <- "sub"
       else if (parts[1] == "session_id") id_map[[parts[1]]] <- "ses"
-      else id_map[[parts[1]]] <- parts[1] # Use var name as flag if not specified
+      else id_map[[parts[1]]] <- parts[1] 
     }
   }
   
-  # 2. Get list of files from nii_data
-  # nii_data can be a directory "path/to/data" or "path/to/data:_T1w"
-  nii_parts <- unlist(strsplit(nii_data, ":"))
-  search_dir <- nii_parts[1]
-  file_suffix <- if (length(nii_parts) > 1) nii_parts[2] else ""
-  if (dir.exists(search_dir)) {
-    all_files <- list.files(search_dir, pattern = "\\.nii(\\.gz)?$",
-                            full.names = TRUE, recursive = TRUE)
-  } else { # If nii_data was already a list of files
-    all_files <- nii_data
+  # Determine default variable names if more than one input
+  if (length(nii_data) == 1) {
+    default_var_names <- "nii"
+  } else {
+    default_var_names <- paste0("nii", 1:length(nii_data))
   }
   
-  # 3. Match each row in 'pf' to exactly one file
-  pf$nii_file <- as.character(NA)
-  for (i in 1:nrow(pf)) {
-    # Build a regex that matches ALL id_vars for this row
-    # Example: sub-1234.*ses-5678.*aid-999.*_T1w.nii
-    regex_parts <- c()
-    for (var_name in names(id_map)) {
-      flag <- id_map[[var_name]]
-      val  <- pf[i, var_name]
-      regex_parts <- c(regex_parts, sprintf("%s-%s", flag, val))
-    }
-    # Combine parts with .* to allow any flags in between
-    # Add the user-specified suffix and the nifti extension
-    match_pattern <- paste0(paste(regex_parts, collapse = ".*"), ".*", file_suffix, "\\.nii(\\.gz)?$")
-    matches <- all_files[grepl(match_pattern, all_files)]
+  datasets_info <- list()
+  for (k in seq_along(nii_data)) {
+    item <- nii_data[k]
+    nii_parts <- unlist(strsplit(item, ":"))
+    search_dir <- nii_parts[1]
+    file_suffix <- if (length(nii_parts) > 1) nii_parts[2] else ""
+    var_name <- if (length(nii_parts) > 2) nii_parts[3] else default_var_names[k]
     
-    if (length(matches) == 0) {
-      warning(sprintf("No matching NIfTI found for row %d (Pattern: %s)", i, match_pattern))
-    } else if (length(matches) > 1) {
-      stop(sprintf("Multiple files found for row %d: %s. Pattern was: %s",
-                   i, paste(basename(matches), collapse=", "), match_pattern))
-    } else {
-      pf$nii_file[i] <- matches
+    if (dir.exists(search_dir)) {
+      all_files <- list.files(search_dir, pattern = "\\.nii(\\.gz)?$",
+                              full.names = TRUE, recursive = TRUE)
+    } else { 
+      all_files <- item
+    }
+    
+    datasets_info[[k]] <- list(
+      search_dir = search_dir,
+      file_suffix = file_suffix,
+      var_name = var_name,
+      all_files = all_files
+    )
+  }
+  
+  # Match each row in 'pf' across all datasets
+  file_cols <- c()
+  for (k in seq_along(datasets_info)) {
+    ds <- datasets_info[[k]]
+    file_col <- sprintf(".nii_file_%d", k)
+    file_cols <- c(file_cols, file_col)
+    pf[[file_col]] <- as.character(NA)
+    
+    for (i in 1:nrow(pf)) {
+      regex_parts <- c()
+      for (var_name_id in names(id_map)) {
+        flag <- id_map[[var_name_id]]
+        val  <- pf[i, var_name_id]
+        regex_parts <- c(regex_parts, sprintf("%s-%s", flag, val))
+      }
+      match_pattern <- paste0(paste(regex_parts, collapse = ".*"), ".*", ds$file_suffix, "\\.nii(\\.gz)?$")
+      matches <- ds$all_files[grepl(match_pattern, ds$all_files)]
+      
+      if (length(matches) == 0) {
+        warning(sprintf("Dataset %d (%s): No matching NIfTI found for row %d (Pattern: %s)", k, ds$var_name, i, match_pattern))
+      } else if (length(matches) > 1) {
+        stop(sprintf("Dataset %d (%s): Multiple files found for row %d: %s. Pattern was: %s",
+                     k, ds$var_name, i, paste(basename(matches), collapse=", "), match_pattern))
+      } else {
+        pf[[file_col]][i] <- matches
+      }
     }
   }
   
-  ## Remove rows where no NIfTI was found
-  pf <- pf[!is.na(pf$nii_file), ]
-  if (nrow(pf) == 0) { stop("Dataset is empty, please check inputs") }
+  # Remove rows where any required NIfTI file was missing
+  missing_any <- apply(pf[, file_cols, drop = FALSE], 1, function(x) any(is.na(x)))
+  pf <- pf[!missing_any, ]
+  if (nrow(pf) == 0) { stop("Dataset is empty after matching NIfTI files, please check inputs") }
   
   # Transfer & Decompress Participant Files ------------------------------------
-  if (verbose) message(sprintf("Preparing %d files in scratch directory...", nrow(pf)))
-  # We use prepNII to handle the heavy lifting (check existence, copy, gunzip)
-  # but we use 'row_i' as the tag to ensure unique filenames in scratch.
-  pf$nii_file <- sapply(1:nrow(pf), function(i) {
-    # Call our standardized helper
-    local_path <- prepNII(path=pf$nii_file[i], tag=paste0("row_", i), dir_scratch=dir_scratch)
-    if (verbose && i %% 10 == 0) {
-      message(sprintf("Prepared %d of %d files...", i, nrow(pf)))
-    }
-    return(local_path)
-  })
-  # Safety check for failed transfers
-  if (any(is.na(pf$nii_file))) {
+  if (verbose) message(sprintf("Preparing files in scratch directory for %d datasets...", length(datasets_info)))
+  for (fc in file_cols) {
+    ds_idx <- sub("^\\.nii_file_", "", fc)
+    pf[[fc]] <- sapply(1:nrow(pf), function(i) {
+      local_path <- prepNII(path=pf[[fc]][i], tag=sprintf("ds%s_row_%d", ds_idx, i), dir_scratch=dir_scratch)
+      return(local_path)
+    })
+  }
+  if (any(is.na(pf[, file_cols, drop = FALSE]))) {
     stop("One or more participant NIfTI files could not be prepared in scratch.")
   }
   
   # load or generate mask -----------------------------------------------------
   if (!missing(roi_nii) && !is.null(roi_nii)) {
     if (verbose) message("Copying ROI mask to scratch")
-    # Copy original file exactly as is to scratch
     local_roi <- file.path(dir_scratch, basename(roi_nii))
     file.copy(roi_nii, local_roi, overwrite = TRUE)
-    # If it's zipped, decompress it locally on scratch
     if (grepl("\\.gz$", local_roi)) {
       roi_nii <- gunzip(local_roi, remove = TRUE, overwrite = TRUE)
     } else {
       roi_nii <- local_roi
     }
-    # load mask
     if (verbose) message(sprintf("Loading ROI mask: %s", basename(roi_nii)))
-    mask <- read.nii.volume(roi_nii,1)
+    mask <- read.nii.volume(roi_nii, 1)
     mask <- (mask != 0) * 1
-    # gather image info
     img_dims <- info.nii(roi_nii, "dims")
     pixdim <- info.nii(roi_nii, "pixdim")
     orient <- info.nii(roi_nii, "orient")
   } else {
-    if (verbose) message("No ROI specified. Generating mask from first data file...")
-    mask <- read.nii.volume(pf$nii_file[1]) * 0 + 1
-    # gather image info
-    img_dims <- info.nii(pf$nii_file[1], "dims")
-    pixdim   <- info.nii(pf$nii_file[1], "pixdim")
-    orient   <- info.nii(pf$nii_file[1], "orient")
+    if (verbose) message("No ROI specified. Generating mask from first data file of the first dataset...")
+    first_file <- pf[[file_cols[1]]][1]
+    mask <- read.nii.volume(first_file) * 0 + 1
+    img_dims <- info.nii(first_file, "dims")
+    pixdim   <- info.nii(first_file, "pixdim")
+    orient   <- info.nii(first_file, "orient")
   }
-  vxl_ls <- which(mask!=0, arr.ind=TRUE)
+  vxl_ls <- which(mask != 0, arr.ind = TRUE)
   
   # specify model function -------------------------------------------------------
-  ## -load voxelwise data
-  ## -run user code (model_fcn)
-  ## -save voxelwise output table
-  ## -write log nii
-  model.fxn <- function(coords, df, ...) {
-    for (i in 1:nrow(df)) { df$nii[i] <- read.nii.voxel(df$nii_file[i], coords) }
+  model.fxn <- function(coords, df, datasets_info, file_cols, ...) {
+    for (k in seq_along(datasets_info)) {
+      var_name <- datasets_info[[k]]$var_name
+      fc <- file_cols[k]
+      for (i in 1:nrow(df)) { 
+        df[[var_name]][i] <- read.nii.voxel(df[[fc]][i], coords) 
+      }
+    }
     modelResult <- model_fcn(df)
     return(modelResult)
   }
   
   # run parallel loop over all voxels ----------------------------------------------
-  do_debug=FALSE
+  do_debug = FALSE
   if (!is.na(debug) && debug > 0) {
-    do_debug=TRUE
+    do_debug = TRUE
     message(sprintf("DEBUG MODE: Running first %d voxels sequentially...", debug))
-    for (X in 1:debug) { model.fxn(X) }
+    for (X in 1:debug) {
+      coords <- vxl_ls[X, ]
+      df <- pf
+      for (k in seq_along(datasets_info)) {
+        df[[datasets_info[[k]]$var_name]] <- numeric(nrow(df))
+      }
+      model.fxn(coords, df, datasets_info, file_cols)
+    }
     message("DEBUG DONE")
   } else {
-    # Run voxels in parallel
     if (verbose) { message(sprintf("Starting voxelwise models on %d cores...", num_cores))}
     proc_start <- Sys.time()
     
-    # Check Log for incomplete voxels ---------------------------------------------
-    # initialize log file if it doesn't exist
     if (verbose) { message("Checking log file") }
     log.nii <- paste0(dir_scratch, "/log.nii")
     if (file.exists(log.nii) == FALSE) {
@@ -232,14 +250,13 @@ modelVoxel <- function(nii_data,
       if (verbose) { message("Continuing prior run") }
     }
     
-    # read log file to get voxel list
-    log <- read.nii.volume(log.nii,1)
+    log <- read.nii.volume(log.nii, 1)
     vxls_not_run <- (log == 1) * 1
-    vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
+    vxl_ls <- which(vxls_not_run == 1, arr.ind = TRUE)
     n.vxls <- nrow(vxl_ls)
     if (n.vxls == 0) { stop("There are no voxels in the specified ROI to run") }
     if (verbose) { message(sprintf("Will process %d voxels.", n.vxls)) }
-    # Check that voxels are valid --------------------------------------------------
+    
     if (verbose) { message("Checking for invalid voxels") }
     valid_rows <- (vxl_ls[, 1] <= img_dims[1]) &
       (vxl_ls[, 2] <= img_dims[2]) &
@@ -253,14 +270,11 @@ modelVoxel <- function(nii_data,
     }
     n.vxls <- nrow(vxl_ls)
     
-    # repeat loop until all voxels are run -------------------------------------
     while (n.vxls > 0) {
-      ## randomize voxel order ---
       if (rand_order) {
         if (verbose) { message("Randomizing voxel order") }
         vxl_ls <- vxl_ls[sample(1:n.vxls, n.vxls, replace=F), ]
       }      
-      ## Split indices into a list of chunks
       chunker <- round(seq(1, n.vxls, length.out=num_cores+1))
       chunk_start <- chunker[1:(length(chunker)-1)]
       chunk_stop <- c(chunker[2:(length(chunker)-1)] - 1, chunker[length(chunker)])
@@ -269,10 +283,10 @@ modelVoxel <- function(nii_data,
           print(sprintf("worker_%02d: chunk %d to %d", i, chunk_start[i], chunk_stop[i]))
         }
       }
-      ## Start parallel workers
+      
       registerDoParallel(num_cores)
       print(sprintf("%d Workers Running", getDoParWorkers()))
-      ## Loop over voxels using parallel workers
+      
       foreach(chk_id = 1:num_cores, .packages = all_libs, .errorhandling="pass") %dopar% {
         worker_start <- Sys.time()
         Sys.sleep(runif(1, 0, 2))
@@ -284,14 +298,14 @@ modelVoxel <- function(nii_data,
           tryCatch({
             coords <- vxl_chunk[i, ]
             df <- pf
-            df$nii <- numeric(nrow(df))
-            modelResult <- model.fxn(coords, df)
-            ## add short delay periodically to reduce the likelihood of I/O collisions
-            #Sys.sleep(runif(1, 0, 0.01))
+            for (k in seq_along(datasets_info)) {
+              df[[datasets_info[[k]]$var_name]] <- numeric(nrow(df))
+            }
+            modelResult <- model.fxn(coords, df, datasets_info, file_cols)
+            
             table.to.nii(in.table=modelResult, coords=coords, save.dir=dir_scratch,
                          do.log=TRUE, model.string=model_pfx,
                          img.dims=img_dims, pixdim=pixdim, orient=orient)
-            #Sys.sleep(runif(1, 0, 0.01))
             write.nii.voxel(log.nii, coords, 2)
           }, error = function(e) {
             error_msg <- sprintf("Voxel %d failed: %s", i, e$message)
@@ -311,12 +325,12 @@ modelVoxel <- function(nii_data,
         elapsed <- difftime(worker_end, worker_start, units = "auto")
         message(sprintf("[%s] COMPLETED. Total elapsed time: %s", worker_id, format(elapsed)))
       }
-      stopImplicitCluster() # Stop parallelization
-      # read log file to get voxel list
+      stopImplicitCluster() 
+      
       message("Checking log file to ensure completeness, will rerun missing voxels.")
-      log <- read.nii.volume(log.nii,1)
+      log <- read.nii.volume(log.nii, 1)
       vxls_not_run <- (log == 1) * 1
-      vxl_ls <- which(vxls_not_run==1, arr.ind=TRUE)
+      vxl_ls <- which(vxls_not_run == 1, arr.ind = TRUE)
       n.vxls <- nrow(vxl_ls)
     }
     proc_stop <- Sys.time()
@@ -325,7 +339,6 @@ modelVoxel <- function(nii_data,
   }
   
   # Create Final Output Directory ------------------------------------------
-  # We use the user's model prefix to create a specific sub-folder
   if (verbose) { message("Creating output directory") }
   output_dir <- file.path(dir_save, model_pfx)
   if (!dir.exists(output_dir)) {
@@ -333,9 +346,6 @@ modelVoxel <- function(nii_data,
   }
   
   # Transfer Results from Scratch to Save ----------------------------------
-  # Identify the results (everything in scratch except the temporary unzipped participant files)
-  # -nifti.io will create files starting with the modelResult
-  # -Compress in scratch first (faster local I/O).
   if (verbose) { message("Moving results and log files to final directory...") }
   result_files <- list.files(dir_scratch, pattern="modelResult", full.names=TRUE)
   for (f in result_files) {
@@ -349,12 +359,10 @@ modelVoxel <- function(nii_data,
   }
   
   # Cleanup ----------------------------------------------------------------
-  ## This removes the scratch folder and all unzipped participant copies
   if (cleanup) {
     if (verbose) message("Cleaning up scratch directory...")
     unlink(dir_scratch, recursive = TRUE)
   }
   if (verbose) message("Voxelwise analysis complete!")
-  # Return the path to the results so the user can easily find them
   return(output_dir)
 }
